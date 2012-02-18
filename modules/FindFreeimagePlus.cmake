@@ -1,0 +1,1 @@
+FIND_PACKAGE_HELPER(FreeimagePlus FreeImagePlus.h FreeImagePlus FreeImagePlusd)

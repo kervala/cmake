@@ -1,0 +1,13 @@
+FOREACH(COMPONENT ${Poppler_FIND_COMPONENTS})
+  IF(COMPONENT STREQUAL "poppler")
+    FIND_PACKAGE_HELPER(Poppler poppler-config.h poppler popplerd)
+  ELSEIF(COMPONENT STREQUAL "poppler-glib")
+    FIND_PACKAGE_HELPER(PopplerGlib poppler.h "popplerglib poppler-glib" "popplerglibd poppler-glibd" "poppler/glib")
+  ELSEIF(COMPONENT STREQUAL "poppler-qt4")
+    FIND_PACKAGE_HELPER(PopplerQt4 poppler-qt4.h "poppler-qt4" "poppler-qt4d" "poppler/qt4")
+  ENDIF(COMPONENT STREQUAL "poppler")
+ENDFOREACH()
+
+IF(POPPLER_FOUND OR POPPLEGLIB_FOUND OR POPPLERQT4_FOUND)
+  SET(POPPLER_INCLUDE_DIRS ${POPPLER_INCLUDE_DIR} ${POPPLERGLIB_INCLUDE_DIR} ${POPPLERQT4_INCLUDE_DIR})
+ENDIF(POPPLER_FOUND OR POPPLEGLIB_FOUND OR POPPLERQT4_FOUND)

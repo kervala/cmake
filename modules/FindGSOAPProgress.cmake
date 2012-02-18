@@ -1,0 +1,1 @@
+FIND_PACKAGE_HELPER(GSOAPProgress plugin_progress.h plugin_progress plugin_progressd)

@@ -1,0 +1,5 @@
+FIND_PACKAGE_HELPER(Pqxx pqxx/pqxx "pqxx libpqxx" "pqxxD libpqxxD")
+
+IF(PQXX_FOUND)
+  SET(PQXX_DEFINITIONS "-DPQXX_SHARED")
+ENDIF(PQXX_FOUND)
