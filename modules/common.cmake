@@ -388,8 +388,38 @@ MACRO(INIT_BUILD_FLAGS)
     SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
   ENDIF(NOT CMAKE_BUILD_TYPE MATCHES "Debug" AND NOT CMAKE_BUILD_TYPE MATCHES "Release")
 
+  SET(MULTIARCH OFF)
+
+  # Check Debian debhelper environnement variables
+  IF(UNIX)
+    SET(HOST_CPU $ENV{DEB_BUILD_ARCH_CPU})
+    SET(TARGET_CPU $ENV{DEB_HOST_ARCH_CPU})
+    SET(TARGET_MULTIARCH $ENV{DEB_HOST_MULTIARCH})
+	
+    IF(HOST_CPU STREQUAL "amd64" AND TARGET_CPU STREQUAL "i386")
+      SET(MULTIARCH ON)
+      ADD_DEFINITIONS(-DHAVE_X86)
+      SET(PLATFORM_CFLAGS "${PLATFORM_CFLAGS} -m32")
+    ENDIF(HOST_CPU STREQUAL "amd64" AND TARGET_CPU STREQUAL "i386")
+
+    IF(HOST_CPU STREQUAL "i386" AND TARGET_CPU STREQUAL "amd64")
+      SET(MULTIARCH ON)
+      SET(TARGET_X64 1)
+      ADD_DEFINITIONS(-DHAVE_X86_64)
+      SET(PLATFORM_CFLAGS "${PLATFORM_CFLAGS} -m64")
+    ENDIF(HOST_CPU STREQUAL "i386" AND TARGET_CPU STREQUAL "amd64")
+
+    IF(TARGET_MULTIARCH)
+      SET(CMAKE_C_LANGUAGE_ARCHITECTURE ${TARGET_MULTIARCH})
+      SET(CMAKE_CXX_LANGUAGE_ARCHITECTURE ${TARGET_MULTIARCH})
+      SET(CMAKE_LIBRARY_ARCHITECTURE ${TARGET_MULTIARCH})
+      SET(CMAKE_C_LIBRARY_ARCHITECTURE ${TARGET_MULTIARCH})
+      SET(CMAKE_CXX_LIBRARY_ARCHITECTURE ${TARGET_MULTIARCH})
+    ENDIF(TARGET_MULTIARCH)
+  ENDIF(UNIX)
+  
   # Determine target CPU
-  IF(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86")
+  IF(NOT MULTIARCH AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86")
     IF(NOT CMAKE_SIZEOF_VOID_P)
       INCLUDE (CheckTypeSize)
       CHECK_TYPE_SIZE("void*"  CMAKE_SIZEOF_VOID_P)
@@ -406,7 +436,7 @@ MACRO(INIT_BUILD_FLAGS)
       ADD_DEFINITIONS(-DHAVE_X86)
     ENDIF(CMAKE_SIZEOF_VOID_P EQUAL 8)
 #     ADD_DEFINITIONS(-DHAVE_IA64)
-  ENDIF(CMAKE_SYSTEM_PROCESSOR STREQUAL "x86")
+  ENDIF(NOT MULTIARCH AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86")
 
   IF(MSVC)
     IF(MSVC10)
@@ -742,12 +772,6 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE RELEASE DEBUG)
     ${INCLUDE}
     HINTS ${PKG_${NAME_FIXED}_INCLUDE_DIRS}
     PATHS
-    /usr/local/include
-    /usr/include
-    /sw/include
-    /opt/local/include
-    /opt/csw/include
-    /opt/include
     $ENV{${UPNAME}_DIR}/include
     ${${UPNAME}_DIR}/include
     $ENV{${UPNAME_FIXED}_DIR}/include
@@ -756,16 +780,27 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE RELEASE DEBUG)
     ${${UPNAME}_DIR}
     $ENV{${UPNAME_FIXED}_DIR}
     ${${UPNAME_FIXED}_DIR}
+    /usr/local/include
+    /usr/include
+    /sw/include
+    /opt/local/include
+    /opt/csw/include
+    /opt/include
     PATH_SUFFIXES
     ${SUFFIXES}
   )
 
-  # Search for release library
-  FIND_LIBRARY(${UPNAME_FIXED}_LIBRARY_RELEASE
-    NAMES
-    ${RELEASE_FIXED}
-    HINTS ${PKG_${NAME_FIXED}_LIBRARY_DIRS}
-    PATHS
+  IF(TARGET_X64)
+    SET(LIBRARY_PATHS "/usr/lib/x86_64-linux-gnu;/usr/freeware/lib64")
+  ELSE(TARGET_X64)
+    SET(LIBRARY_PATHS "/usr/lib/i386-linux-gnu")
+  ENDIF(TARGET_X64)
+  
+  SET(LIBRARY_PATHS ${LIBRARY_PATHS} 
+    $ENV{${UPNAME}_DIR}/lib${SUFFIX}
+    ${${UPNAME}_DIR}/lib${SUFFIX}
+    $ENV{${UPNAME_FIXED}_DIR}/lib${SUFFIX}
+    ${${UPNAME_FIXED}_DIR}/lib${SUFFIX}
     /usr/local/lib
     /usr/lib
     /usr/local/X11R6/lib
@@ -773,12 +808,15 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE RELEASE DEBUG)
     /sw/lib
     /opt/local/lib
     /opt/csw/lib
-    /opt/lib
-    /usr/freeware/lib64
-    $ENV{${UPNAME}_DIR}/lib${SUFFIX}
-    ${${UPNAME}_DIR}/lib${SUFFIX}
-    $ENV{${UPNAME_FIXED}_DIR}/lib${SUFFIX}
-    ${${UPNAME_FIXED}_DIR}/lib${SUFFIX}
+    /opt/lib)
+
+  # Search for release library
+  FIND_LIBRARY(${UPNAME_FIXED}_LIBRARY_RELEASE
+    NAMES
+    ${RELEASE_FIXED}
+    HINTS ${PKG_${NAME_FIXED}_LIBRARY_DIRS}
+    PATHS
+    ${LIBRARY_PATHS}
   )
 
   # Search for debug library
@@ -787,19 +825,7 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE RELEASE DEBUG)
     ${DEBUG_FIXED}
     HINTS ${PKG_${NAME_FIXED}_LIBRARY_DIRS}
     PATHS
-    /usr/local/lib
-    /usr/lib
-    /usr/local/X11R6/lib
-    /usr/X11R6/lib
-    /sw/lib
-    /opt/local/lib
-    /opt/csw/lib
-    /opt/lib
-    /usr/freeware/lib64
-    $ENV{${UPNAME}_DIR}/lib${SUFFIX}
-    ${${UPNAME}_DIR}/lib${SUFFIX}
-    $ENV{${UPNAME_FIXED}_DIR}/lib${SUFFIX}
-    ${${UPNAME_FIXED}_DIR}/lib${SUFFIX}
+    ${LIBRARY_PATHS}
   )
   
   IF(${UPNAME_FIXED}_INCLUDE_DIR)
