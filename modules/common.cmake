@@ -405,6 +405,8 @@ MACRO(INIT_BUILD_FLAGS)
     SET(TARGET_CPU "x86")
   ENDIF(TARGET_CPU MATCHES "amd64")
 
+  MESSAGE(STATUS "Host ${HOST_CPU} target ${TARGET_CPU}")
+  
   # If target and host CPU are the same
   IF("${HOST_CPU}" STREQUAL "${TARGET_CPU}")
     # x86-compatible CPU
