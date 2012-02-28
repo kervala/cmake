@@ -174,8 +174,15 @@ MACRO(ADD_PRECOMPILED_HEADER _targetName _inputh _inputcpp)
 	ADD_PRECOMPILED_HEADER_TO_TARGET(${_targetName} ${_inputh} ${_output})
 ENDMACRO(ADD_PRECOMPILED_HEADER)
 
+MACRO(FIX_PRECOMPILED_HEADER _files _pch)
+	# Remove .cpp creating PCH from the list
+	LIST(REMOVE_ITEM ${_files} ${_pch})
+	# Prepend .cpp creating PCH to the list
+	LIST(INSERT ${_files} 0 ${_pch})
+ENDMACRO(FIX_PRECOMPILED_HEADER)
+
 MACRO(ADD_NATIVE_PRECOMPILED_HEADER _targetName _inputh _inputcpp)
-	IF(CMAKE_GENERATOR MATCHES Visual*)
+	IF(CMAKE_GENERATOR MATCHES "(Visual*|NMake*)")
 		# Auto include the precompile (useful for moc processing, since the use of
 		# precompiled is specified at the target level
 		# and I don't want to specifiy /F- for each moc/res/ui generated files (using Qt)
@@ -190,7 +197,7 @@ MACRO(ADD_NATIVE_PRECOMPILED_HEADER _targetName _inputh _inputcpp)
 
 		#also inlude ${oldProps} to have the same compile options
 		SET_SOURCE_FILES_PROPERTIES(${_inputcpp} PROPERTIES COMPILE_FLAGS "${oldProps} /Yc\"${_inputh}\"")
-	ELSE(CMAKE_GENERATOR MATCHES Visual*)
+	ELSE(CMAKE_GENERATOR MATCHES "(Visual*|NMake*)")
 		IF(CMAKE_GENERATOR MATCHES Xcode)
 			# For Xcode, cmake needs my patch to process
 			# GCC_PREFIX_HEADER and GCC_PRECOMPILE_PREFIX_HEADER as target properties
@@ -210,6 +217,6 @@ MACRO(ADD_NATIVE_PRECOMPILED_HEADER _targetName _inputh _inputcpp)
 			#Fallback to the "old" precompiled suppport
 			ADD_PRECOMPILED_HEADER(${_targetName} ${_inputh} ${_inputcpp})
 		ENDIF(CMAKE_GENERATOR MATCHES Xcode)
-	ENDIF(CMAKE_GENERATOR MATCHES Visual*)
+	ENDIF(CMAKE_GENERATOR MATCHES "(Visual*|NMake*)")
 
 ENDMACRO(ADD_NATIVE_PRECOMPILED_HEADER)
