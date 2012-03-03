@@ -124,10 +124,7 @@ MACRO(SET_TARGET_GUI_EXECUTABLE name)
   SET_DEFAULT_PROPS(${name})
 
   IF(WIN32)
-    IF(MFC_FOUND)
-      MESSAGE(STATUS "Using comctl32.dll manifest because MFC need it")
-      SET_TARGET_PROPERTIES(${name} PROPERTIES LINK_FLAGS "/MANIFESTDEPENDENCY:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' publicKeyToken='6595b64144ccf1df' language='*' processorArchitecture='*'\"")
-    ENDIF(MFC_FOUND)
+    SET_TARGET_PROPERTIES(${name} PROPERTIES LINK_FLAGS "/MANIFESTDEPENDENCY:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' publicKeyToken='6595b64144ccf1df' language='*' processorArchitecture='*'\"")
   ENDIF(WIN32)
 
   INSTALL(TARGETS ${name} RUNTIME DESTINATION ${BIN_PREFIX})
