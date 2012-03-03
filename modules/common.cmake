@@ -191,7 +191,7 @@ MACRO(SET_TARGET_LIB name)
     # copy also PDB files in installation directory for Visual C++
     IF(MSVC)
       # get final location for Debug configuration
-      GET_TARGET_PROPERTY(OUTPUT_FULLPATH ${name} DEBUG_LOCATION)
+      GET_TARGET_PROPERTY(OUTPUT_FULLPATH ${name} LOCATION_Debug)
       # replace extension by .pdb
 	  STRING(REGEX REPLACE "\\.([a-zA-Z0-9_]+)$" ".pdb" OUTPUT_FULLPATH ${OUTPUT_FULLPATH})
       IF(IS_STATIC)
