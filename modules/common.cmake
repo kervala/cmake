@@ -629,58 +629,55 @@ MACRO(SETUP_PREFIX_PATHS name)
     SETUP_BUILD_FLAGS()
   ENDIF(NOT BUILD_FLAGS_SETUP)
 
-  ## Allow override of install_prefix path.
-  SET(PREFIX "${CMAKE_INSTALL_PREFIX}")
-
   IF(UNIX)
     ## Allow override of install_prefix/etc path.
     IF(NOT ETC_PREFIX)
-      SET(ETC_PREFIX "${PREFIX}/etc/${name}" CACHE PATH "Installation path for configurations")
+      SET(ETC_PREFIX "etc/${name}" CACHE PATH "Installation path for configurations")
     ENDIF(NOT ETC_PREFIX)
 
     ## Allow override of install_prefix/share path.
     IF(NOT SHARE_PREFIX)
-      SET(SHARE_PREFIX "${PREFIX}/share/${name}" CACHE PATH "Installation path for data.")
+      SET(SHARE_PREFIX "share/${name}" CACHE PATH "Installation path for data.")
     ENDIF(NOT SHARE_PREFIX)
 
     ## Allow override of install_prefix/sbin path.
     IF(NOT SBIN_PREFIX)
-      SET(SBIN_PREFIX "${PREFIX}/sbin" CACHE PATH "Installation path for admin tools and services.")
+      SET(SBIN_PREFIX "sbin" CACHE PATH "Installation path for admin tools and services.")
     ENDIF(NOT SBIN_PREFIX)
 
     ## Allow override of install_prefix/bin path.
     IF(NOT BIN_PREFIX)
-      SET(BIN_PREFIX "${PREFIX}/bin" CACHE PATH "Installation path for tools and applications.")
+      SET(BIN_PREFIX "bin" CACHE PATH "Installation path for tools and applications.")
     ENDIF(NOT BIN_PREFIX)
 
     ## Allow override of install_prefix/include path.
     IF(NOT INCLUDE_PREFIX)
-      SET(INCLUDE_PREFIX "${PREFIX}/include" CACHE PATH "Installation path for headers.")
+      SET(INCLUDE_PREFIX "include" CACHE PATH "Installation path for headers.")
     ENDIF(NOT INCLUDE_PREFIX)
 
     ## Allow override of install_prefix/lib path.
     IF(NOT LIB_PREFIX)
       IF(CMAKE_LIBRARY_ARCHITECTURE)
-        SET(LIB_PREFIX "${PREFIX}/lib/${CMAKE_LIBRARY_ARCHITECTURE}" CACHE PATH "Installation path for libraries.")
+        SET(LIB_PREFIX "lib/${CMAKE_LIBRARY_ARCHITECTURE}" CACHE PATH "Installation path for libraries.")
       ELSE(CMAKE_LIBRARY_ARCHITECTURE)
-        SET(LIB_PREFIX "${PREFIX}/lib" CACHE PATH "Installation path for libraries.")
+        SET(LIB_PREFIX "lib" CACHE PATH "Installation path for libraries.")
       ENDIF(CMAKE_LIBRARY_ARCHITECTURE)
     ENDIF(NOT LIB_PREFIX)
 
     ## Allow override of install_prefix/lib path.
     IF(NOT PLUGIN_PREFIX)
       IF(CMAKE_LIBRARY_ARCHITECTURE)
-        SET(PLUGIN_PREFIX "${PREFIX}/lib/${CMAKE_LIBRARY_ARCHITECTURE}/${name}" CACHE PATH "Installation path for plugins.")
+        SET(PLUGIN_PREFIX "lib/${CMAKE_LIBRARY_ARCHITECTURE}/${name}" CACHE PATH "Installation path for plugins.")
       ELSE(CMAKE_LIBRARY_ARCHITECTURE)
-        SET(PLUGIN_PREFIX "${PREFIX}/lib/${name}" CACHE PATH "Installation path for plugins.")
+        SET(PLUGIN_PREFIX "lib/${name}" CACHE PATH "Installation path for plugins.")
       ENDIF(CMAKE_LIBRARY_ARCHITECTURE)
     ENDIF(NOT PLUGIN_PREFIX)
 
     # Aliases for automake compatibility
-    SET(prefix ${PREFIX})
+    SET(prefix ${CMAKE_INSTALL_PREFIX})
     SET(exec_prefix ${BIN_PREFIX})
     SET(libdir ${LIB_PREFIX})
-    SET(includedir ${PREFIX}/include)
+    SET(includedir ${INCLUDE_PREFIX})
   ENDIF(UNIX)
   IF(WIN32)
     IF(TARGET_X64)
