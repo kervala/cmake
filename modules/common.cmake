@@ -632,52 +632,73 @@ MACRO(SETUP_PREFIX_PATHS name)
   IF(UNIX)
     ## Allow override of install_prefix/etc path.
     IF(NOT ETC_PREFIX)
-      SET(ETC_PREFIX "etc/${name}" CACHE PATH "Installation path for configurations")
+      SET(ETC_PREFIX "etc/${name}")
+      SET(ETC_FULL_PREFIX "${CMAKE_INSTALL_PREFIX}/${ETC_PREFIX}")
+    ELSE(NOT ETC_PREFIX)
+      SET(ETC_FULL_PREFIX ${ETC_PREFIX})
     ENDIF(NOT ETC_PREFIX)
 
     ## Allow override of install_prefix/share path.
     IF(NOT SHARE_PREFIX)
-      SET(SHARE_PREFIX "share/${name}" CACHE PATH "Installation path for data.")
+      SET(SHARE_PREFIX "share/${name}")
+      SET(SHARE_FULL_PREFIX "${CMAKE_INSTALL_PREFIX}/${SHARE_PREFIX}")
+    ELSE(NOT SHARE_PREFIX)
+      SET(SHARE_FULL_PREFIX ${SHARE_PREFIX})
     ENDIF(NOT SHARE_PREFIX)
 
     ## Allow override of install_prefix/sbin path.
     IF(NOT SBIN_PREFIX)
-      SET(SBIN_PREFIX "sbin" CACHE PATH "Installation path for admin tools and services.")
+      SET(SBIN_PREFIX "sbin")
+      SET(SBIN_FULL_PREFIX "${CMAKE_INSTALL_PREFIX}/${SBIN_PREFIX}")
+    ELSE(NOT SBIN_PREFIX)
+      SET(SBIN_FULL_PREFIX ${SBIN_PREFIX})
     ENDIF(NOT SBIN_PREFIX)
 
     ## Allow override of install_prefix/bin path.
     IF(NOT BIN_PREFIX)
-      SET(BIN_PREFIX "bin" CACHE PATH "Installation path for tools and applications.")
+      SET(BIN_PREFIX "bin")
+      SET(BIN_FULL_PREFIX "${CMAKE_INSTALL_PREFIX}/${BIN_PREFIX}")
+    ELSE(NOT BIN_PREFIX)
+      SET(BIN_FULL_PREFIX ${BIN_PREFIX})
     ENDIF(NOT BIN_PREFIX)
 
     ## Allow override of install_prefix/include path.
     IF(NOT INCLUDE_PREFIX)
-      SET(INCLUDE_PREFIX "include" CACHE PATH "Installation path for headers.")
+      SET(INCLUDE_PREFIX "include")
+      SET(INCLUDE_FULL_PREFIX "${CMAKE_INSTALL_PREFIX}/${INCLUDE_PREFIX}")
+    ELSE(NOT INCLUDE_PREFIX)
+      SET(INCLUDE_FULL_PREFIX ${INCLUDE_PREFIX})
     ENDIF(NOT INCLUDE_PREFIX)
 
     ## Allow override of install_prefix/lib path.
     IF(NOT LIB_PREFIX)
       IF(CMAKE_LIBRARY_ARCHITECTURE)
-        SET(LIB_PREFIX "lib/${CMAKE_LIBRARY_ARCHITECTURE}" CACHE PATH "Installation path for libraries.")
+        SET(LIB_PREFIX "lib/${CMAKE_LIBRARY_ARCHITECTURE}")
       ELSE(CMAKE_LIBRARY_ARCHITECTURE)
-        SET(LIB_PREFIX "lib" CACHE PATH "Installation path for libraries.")
+        SET(LIB_PREFIX "lib")
       ENDIF(CMAKE_LIBRARY_ARCHITECTURE)
+      SET(LIB_FULL_PREFIX "${CMAKE_INSTALL_PREFIX}/${LIB_PREFIX}")
+    ELSE(NOT LIB_PREFIX)
+      SET(LIB_FULL_PREFIX ${LIB_PREFIX})
     ENDIF(NOT LIB_PREFIX)
 
     ## Allow override of install_prefix/lib path.
     IF(NOT PLUGIN_PREFIX)
       IF(CMAKE_LIBRARY_ARCHITECTURE)
-        SET(PLUGIN_PREFIX "lib/${CMAKE_LIBRARY_ARCHITECTURE}/${name}" CACHE PATH "Installation path for plugins.")
+        SET(PLUGIN_PREFIX "lib/${CMAKE_LIBRARY_ARCHITECTURE}/${name}")
       ELSE(CMAKE_LIBRARY_ARCHITECTURE)
-        SET(PLUGIN_PREFIX "lib/${name}" CACHE PATH "Installation path for plugins.")
+        SET(PLUGIN_PREFIX "lib/${name}")
       ENDIF(CMAKE_LIBRARY_ARCHITECTURE)
+      SET(PLUGIN_FULL_PREFIX "${CMAKE_INSTALL_PREFIX}/${PLUGIN_PREFIX}")
+    ELSE(NOT PLUGIN_PREFIX)
+      SET(PLUGIN_FULL_PREFIX ${PLUGIN_PREFIX})
     ENDIF(NOT PLUGIN_PREFIX)
 
     # Aliases for automake compatibility
     SET(prefix ${CMAKE_INSTALL_PREFIX})
-    SET(exec_prefix ${BIN_PREFIX})
-    SET(libdir ${LIB_PREFIX})
-    SET(includedir ${INCLUDE_PREFIX})
+    SET(exec_prefix ${BIN_FULL_PREFIX})
+    SET(libdir ${LIB_FULL_PREFIX})
+    SET(includedir ${INCLUDE_FULL_PREFIX})
   ENDIF(UNIX)
   IF(WIN32)
     IF(TARGET_X64)
@@ -749,13 +770,19 @@ MACRO(SETUP_EXTERNAL)
       ENDIF(NOT VC_DIR)
     ENDIF(MSVC10)
   ELSE(WIN32)
-    IF(CMAKE_FIND_LIBRARY_SUFFIXES AND NOT APPLE)
+    IF(APPLE)
       IF(WITH_STATIC_EXTERNAL)
-        SET(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+        SET(CMAKE_FIND_LIBRARY_SUFFIXES .a .dylib .so)
       ELSE(WITH_STATIC_EXTERNAL)
-        SET(CMAKE_FIND_LIBRARY_SUFFIXES ".so")
+        SET(CMAKE_FIND_LIBRARY_SUFFIXES .dylib .so .a)
       ENDIF(WITH_STATIC_EXTERNAL)
-    ENDIF(CMAKE_FIND_LIBRARY_SUFFIXES AND NOT APPLE)
+    ELSE(APPLE)
+      IF(WITH_STATIC_EXTERNAL)
+        SET(CMAKE_FIND_LIBRARY_SUFFIXES .a .so)
+      ELSE(WITH_STATIC_EXTERNAL)
+        SET(CMAKE_FIND_LIBRARY_SUFFIXES .so .a)
+      ENDIF(WITH_STATIC_EXTERNAL)
+    ENDIF(APPLE)
   ENDIF(WIN32)
 
   IF(WITH_STLPORT)
@@ -849,23 +876,24 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE RELEASE DEBUG)
     SET(LIBRARY_PATHS "/lib/${CMAKE_LIBRARY_ARCHITECTURE};/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}")
   ENDIF(CMAKE_LIBRARY_ARCHITECTURE)
 
-  IF(TARGET_X64)
-    SET(LIBRARY_PATHS ${LIBRARY_PATHS} /usr/freeware/lib64)
-  ENDIF(TARGET_X64)
-
-  SET(LIBRARY_PATHS ${LIBRARY_PATHS} 
+  SET(LIBRARY_PATHS ${LIBRARY_PATHS}
     $ENV{${UPNAME}_DIR}/lib${LIB_SUFFIX}
     ${${UPNAME}_DIR}/lib${LIB_SUFFIX}
     $ENV{${UPNAME_FIXED}_DIR}/lib${LIB_SUFFIX}
-    ${${UPNAME_FIXED}_DIR}/lib${LIB_SUFFIX}
-    /usr/local/lib
-    /usr/lib
-    /usr/local/X11R6/lib
-    /usr/X11R6/lib
-    /sw/lib
-    /opt/local/lib
-    /opt/csw/lib
-    /opt/lib)
+    ${${UPNAME_FIXED}_DIR}/lib${LIB_SUFFIX})
+
+  IF(UNIX)
+    SET(LIBRARY_PATHS ${LIBRARY_PATHS}
+      /usr/local/lib
+      /usr/lib
+      /usr/local/X11R6/lib
+      /usr/X11R6/lib
+      /sw/lib
+      /opt/local/lib
+      /opt/csw/lib
+      /opt/lib
+      /usr/freeware/lib${LIB_SUFFIX})
+  ENDIF(UNIX)
 
   # Search for release library
   FIND_LIBRARY(${UPNAME_FIXED}_LIBRARY_RELEASE
@@ -874,6 +902,7 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE RELEASE DEBUG)
     HINTS ${PKG_${NAME_FIXED}_LIBRARY_DIRS}
     PATHS
     ${LIBRARY_PATHS}
+    NO_CMAKE_SYSTEM_PATH
   )
 
   # Search for debug library
@@ -883,8 +912,9 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE RELEASE DEBUG)
     HINTS ${PKG_${NAME_FIXED}_LIBRARY_DIRS}
     PATHS
     ${LIBRARY_PATHS}
+    NO_CMAKE_SYSTEM_PATH
   )
-  
+
   IF(${UPNAME_FIXED}_INCLUDE_DIR)
     IF(${UPNAME_FIXED}_LIBRARY_RELEASE)
       # Library has been found if only one library and include are found
