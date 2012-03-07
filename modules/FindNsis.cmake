@@ -25,7 +25,7 @@ ENDIF(NSIS_EXECUTABLE)
 
 MACRO(ADD_NSIS_PACKAGE SCRIPT)
   SET(NSIS_OPTIONS "")
-  FOREACH(arg ${ARGN})            
+  FOREACH(arg ${ARGN})
     # Fix path for Windows
     STRING(REPLACE "/" "\\" arg ${arg})
     SET(NSIS_OPTIONS ${NSIS_OPTIONS} -D${arg})

@@ -174,6 +174,7 @@ MACRO(ADD_PRECOMPILED_HEADER _targetName _inputh _inputcpp)
 	ADD_PRECOMPILED_HEADER_TO_TARGET(${_targetName} ${_inputh} ${_output})
 ENDMACRO(ADD_PRECOMPILED_HEADER)
 
+# Macro to move PCH creation file to the front of files list
 MACRO(FIX_PRECOMPILED_HEADER _files _pch)
 	# Remove .cpp creating PCH from the list
 	LIST(REMOVE_ITEM ${_files} ${_pch})
