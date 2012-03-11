@@ -9,7 +9,7 @@
 #   ADD_NATIVE_PRECOMPILED_HEADER _targetName _inputh _inputcpp
 
 IF(MSVC)
-	SET(PCHSupport_FOUND TRUE) # for experimental msvc support
+	SET(PCHSupport_FOUND TRUE)
 	SET(_PCH_include_prefix "/I")
 ELSE(MSVC)
 	IF(CMAKE_COMPILER_IS_GNUCXX)
@@ -183,7 +183,22 @@ MACRO(FIX_PRECOMPILED_HEADER _files _pch)
 ENDMACRO(FIX_PRECOMPILED_HEADER)
 
 MACRO(ADD_NATIVE_PRECOMPILED_HEADER _targetName _inputh _inputcpp)
-	IF(CMAKE_GENERATOR MATCHES "(Visual*|NMake*)")
+	# 0 => creating a new target for PCH, works for all makefiles
+	# 1 => setting PCH for VC++ project, works for VC++ projects
+	# 2 => setting PCH for XCode project, works for XCode projects
+	IF(CMAKE_GENERATOR MATCHES "Visual Studio")
+		SET(PCH_METHOD 1)
+	ELSEIF(CMAKE_GENERATOR MATCHES "NMake Makefiles" AND MFC_FOUND AND CMAKE_MFC_FLAG)
+		# To fix a bug with MFC
+		# Don't forget to use FIX_PRECOMPILED_HEADER before creating the target
+		SET(PCH_METHOD 1)
+	ELSEIF(CMAKE_GENERATOR MATCHES "Xcode")
+		SET(PCH_METHOD 2)
+	ELSE(CMAKE_GENERATOR MATCHES "Visual Studio")
+		SET(PCH_METHOD 0)
+	ENDIF(CMAKE_GENERATOR MATCHES "Visual Studio")
+
+	IF(PCH_METHOD EQUAL 1)
 		# Auto include the precompile (useful for moc processing, since the use of
 		# precompiled is specified at the target level
 		# and I don't want to specifiy /F- for each moc/res/ui generated files (using Qt)
@@ -198,26 +213,24 @@ MACRO(ADD_NATIVE_PRECOMPILED_HEADER _targetName _inputh _inputcpp)
 
 		#also inlude ${oldProps} to have the same compile options
 		SET_SOURCE_FILES_PROPERTIES(${_inputcpp} PROPERTIES COMPILE_FLAGS "${oldProps} /Yc\"${_inputh}\"")
-	ELSE(CMAKE_GENERATOR MATCHES "(Visual*|NMake*)")
-		IF(CMAKE_GENERATOR MATCHES Xcode)
-			# For Xcode, cmake needs my patch to process
-			# GCC_PREFIX_HEADER and GCC_PRECOMPILE_PREFIX_HEADER as target properties
+	ELSEIF(PCH_METHOD EQUAL 2)
+		# For Xcode, cmake needs my patch to process
+		# GCC_PREFIX_HEADER and GCC_PRECOMPILE_PREFIX_HEADER as target properties
 
-			GET_TARGET_PROPERTY(oldProps ${_targetName} COMPILE_FLAGS)
-			IF(${oldProps} MATCHES NOTFOUND)
-				SET(oldProps "")
-			ENDIF(${oldProps} MATCHES NOTFOUND)
+		GET_TARGET_PROPERTY(oldProps ${_targetName} COMPILE_FLAGS)
+		IF(${oldProps} MATCHES NOTFOUND)
+			SET(oldProps "")
+		ENDIF(${oldProps} MATCHES NOTFOUND)
 
-			# When buiding out of the tree, precompiled may not be located
-			# Use full path instead.
-			GET_FILENAME_COMPONENT(fullPath ${_inputh} ABSOLUTE)
+		# When buiding out of the tree, precompiled may not be located
+		# Use full path instead.
+		GET_FILENAME_COMPONENT(fullPath ${_inputh} ABSOLUTE)
 
-			SET_TARGET_PROPERTIES(${_targetName} PROPERTIES XCODE_ATTRIBUTE_GCC_PREFIX_HEADER "${fullPath}")
-			SET_TARGET_PROPERTIES(${_targetName} PROPERTIES XCODE_ATTRIBUTE_GCC_PRECOMPILE_PREFIX_HEADER "YES")
-		ELSE(CMAKE_GENERATOR MATCHES Xcode)
-			#Fallback to the "old" precompiled suppport
-			ADD_PRECOMPILED_HEADER(${_targetName} ${_inputh} ${_inputcpp})
-		ENDIF(CMAKE_GENERATOR MATCHES Xcode)
-	ENDIF(CMAKE_GENERATOR MATCHES "(Visual*|NMake*)")
+		SET_TARGET_PROPERTIES(${_targetName} PROPERTIES XCODE_ATTRIBUTE_GCC_PREFIX_HEADER "${fullPath}")
+		SET_TARGET_PROPERTIES(${_targetName} PROPERTIES XCODE_ATTRIBUTE_GCC_PRECOMPILE_PREFIX_HEADER "YES")
+	ELSE(PCH_METHOD EQUAL 1)
+		#Fallback to the "old" precompiled suppport
+		ADD_PRECOMPILED_HEADER(${_targetName} ${_inputh} ${_inputcpp})
+	ENDIF(PCH_METHOD EQUAL 1)
 
 ENDMACRO(ADD_NATIVE_PRECOMPILED_HEADER)

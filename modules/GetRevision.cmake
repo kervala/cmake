@@ -3,7 +3,10 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6.3)
 # ROOT_DIR should be set to root of the repository (where to find the .svn or .hg directory)
 # SOURCE_DIR should be set to root of your code (where to find CMakeLists.txt)
 
-SET(CMAKE_MODULE_PATH "${SOURCE_DIR}/CMakeModules;${CMAKE_MODULE_PATH}")
+# Replace spaces by semi-columns
+STRING(REPLACE " " ";" CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH})
+
+SET(CMAKE_MODULE_PATH  ${SOURCE_DIR}/CMakeModules ${CMAKE_MODULE_PATH})
 
 IF(NOT ROOT_DIR AND SOURCE_DIR)
   SET(ROOT_DIR ${SOURCE_DIR})
@@ -21,7 +24,7 @@ MACRO(NOW RESULT)
     EXECUTE_PROCESS(COMMAND "date" "+'%Y-%m-%d %H:%M:%S'" OUTPUT_VARIABLE ${RESULT})
   ELSE (WIN32)
     MESSAGE(SEND_ERROR "date not implemented")
-    SET(${RESULT} 000000)
+    SET(${RESULT} "0000-00-00 00:00:00")
   ENDIF (WIN32)
 ENDMACRO(NOW)
 

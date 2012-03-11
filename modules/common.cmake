@@ -50,24 +50,36 @@ ENDMACRO(GEN_INIT_D)
 ###
 MACRO(GEN_REVISION_H)
   IF(EXISTS ${CMAKE_SOURCE_DIR}/revision.h.in)
-    INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR})
-    ADD_DEFINITIONS(-DHAVE_REVISION_H)
-    SET(HAVE_REVISION_H ON)
+    # Search GetRevision.cmake in each directory from CMAKE_MODULE_PATH
+    FOREACH(ITEM ${CMAKE_MODULE_PATH})
+      IF(EXISTS "${ITEM}/GetRevision.cmake")
+        SET(GET_REVISION_DIR ${ITEM})
+        MESSAGE(STATUS "Found GetRevision module in ${ITEM}")
+        BREAK()
+      ENDIF(EXISTS "${ITEM}/GetRevision.cmake")
+    ENDFOREACH(ITEM)
+	
+    IF(GET_REVISION_DIR)
+      INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR})
+      ADD_DEFINITIONS(-DHAVE_REVISION_H)
+      SET(HAVE_REVISION_H ON)
 
-    # a custom target that is always built
-    ADD_CUSTOM_TARGET(revision ALL
-      DEPENDS ${CMAKE_BINARY_DIR}/revision.h)
+      # a custom target that is always built
+      ADD_CUSTOM_TARGET(revision ALL
+        DEPENDS ${CMAKE_BINARY_DIR}/revision.h)
 
-    # creates revision.h using cmake script
-    ADD_CUSTOM_COMMAND(OUTPUT ${CMAKE_BINARY_DIR}/revision.h
-      COMMAND ${CMAKE_COMMAND}
-      -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
-      -P ${CMAKE_SOURCE_DIR}/CMakeModules/GetRevision.cmake)
+      # creates revision.h using cmake script
+      ADD_CUSTOM_COMMAND(OUTPUT ${CMAKE_BINARY_DIR}/revision.h
+        COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+        -DCMAKE_MODULE_PATH="${CMAKE_MODULE_PATH}"
+        -P ${GET_REVISION_DIR}/GetRevision.cmake)
 
-    # revision.h is a generated file
-    SET_SOURCE_FILES_PROPERTIES(${CMAKE_BINARY_DIR}/revision.h
-      PROPERTIES GENERATED TRUE
-      HEADER_FILE_ONLY TRUE)
+      # revision.h is a generated file
+      SET_SOURCE_FILES_PROPERTIES(${CMAKE_BINARY_DIR}/revision.h
+        PROPERTIES GENERATED TRUE
+        HEADER_FILE_ONLY TRUE)
+    ENDIF(GET_REVISION_DIR)
   ENDIF(EXISTS ${CMAKE_SOURCE_DIR}/revision.h.in)
 ENDMACRO(GEN_REVISION_H)
 
