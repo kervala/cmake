@@ -65,11 +65,11 @@ MACRO(GEN_REVISION_H)
       SET(HAVE_REVISION_H ON)
 
       # a custom target that is always built
-      ADD_CUSTOM_TARGET(revision ALL
-        DEPENDS ${CMAKE_BINARY_DIR}/revision.h)
+      ADD_CUSTOM_TARGET(revision ALL)
 
       # creates revision.h using cmake script
-      ADD_CUSTOM_COMMAND(OUTPUT ${CMAKE_BINARY_DIR}/revision.h
+      ADD_CUSTOM_COMMAND(TARGET revision
+        PRE_BUILD
         COMMAND ${CMAKE_COMMAND}
         -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
         -DCMAKE_MODULE_PATH="${CMAKE_MODULE_PATH}"
