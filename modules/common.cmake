@@ -373,6 +373,14 @@ MACRO(INIT_DEFAULT_OPTIONS)
     SET_OPTION_DEFAULT(WITH_UNIX_STRUCTURE ON)
   ENDIF(WIN32)
 
+  # Check if CMake is launched from a Debian packaging script
+  SET(DEB_HOST_GNU_CPU $ENV{DEB_HOST_GNU_CPU})
+
+  # Don't strip if generating a .deb
+  IF(DEB_HOST_GNU_CPU)
+    SET_OPTION_DEFAULT(WITH_NO_STRIP ON)
+  ENDIF(DEB_HOST_GNU_CPU)
+
   # Tells SETUP_DEFAULT_OPTIONS to not initialize options again
   SET(DEFAULT_OPTIONS_INIT ON)
 ENDMACRO(INIT_DEFAULT_OPTIONS)
@@ -956,6 +964,7 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE RELEASE DEBUG)
       # Library has been found if only one library and include are found
       SET(${UPNAME_FIXED}_FOUND TRUE)
       SET(${UPNAME_FIXED}_LIBRARIES ${${UPNAME_FIXED}_LIBRARY_RELEASE})
+      SET(${UPNAME_FIXED}_LIBRARY ${${UPNAME_FIXED}_LIBRARY_RELEASE})
       IF(${UPNAME_FIXED}_LIBRARY_DEBUG)
         # If debug version is found, use the right one
         SET(${UPNAME_FIXED}_LIBRARIES optimized ${${UPNAME_FIXED}_LIBRARIES} debug ${${UPNAME_FIXED}_LIBRARY_DEBUG})
