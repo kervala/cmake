@@ -1,5 +1,34 @@
 SET(COMMON_MODULE_FOUND TRUE)
 
+# check for TARGET Android, iPhone device, iPhone simulator
+
+# Check if CMake is using Wine
+IF($ENV{WINELOADERNOEXEC} MATCHES ".+")
+  # Wine found
+ENDIF($ENV{WINELOADERNOEXEC} MATCHES ".+")
+
+# Force Release configuration for compiler checks
+SET(CMAKE_TRY_COMPILE_CONFIGURATION "Release")
+
+# Force Release configuration by default
+IF(NOT CMAKE_BUILD_TYPE)
+  SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
+ENDIF(NOT CMAKE_BUILD_TYPE)
+
+#CMAKE_FORCE_CXX_COMPILER()
+#CMAKE_FORCE_C_COMPILER()
+
+#CMAKE_COMPILER_IS_GNUCXX
+
+#IF(CMAKE_GENERATOR MATCHES "Visual Studio")
+#ENDIF(CMAKE_GENERATOR MATCHES "Visual Studio")
+
+#"NMake Makefiles"
+#"Xcode"
+#"Unix Makefiles"
+#"MinGW Makefiles"
+#"MSYS Makefiles"
+
 ###
 # Helper macro that generates .pc and installs it.
 # Argument: name - the name of the .pc package, e.g. "mylib.pc"
