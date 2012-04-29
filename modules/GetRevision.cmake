@@ -50,10 +50,10 @@ IF(EXISTS "${ROOT_DIR}/.hg/")
   ENDIF(MERCURIAL_FOUND)
 ENDIF(EXISTS "${ROOT_DIR}/.hg/")
 
-IF(REVISION)
+IF(DEFINED REVISION)
   IF(EXISTS ${SOURCE_DIR}/revision.h.in)
     NOW(BUILD_DATE)
     CONFIGURE_FILE(${SOURCE_DIR}/revision.h.in revision.h.txt)
     EXECUTE_PROCESS(COMMAND ${CMAKE_COMMAND} -E copy revision.h.txt revision.h) # copy_if_different
   ENDIF(EXISTS ${SOURCE_DIR}/revision.h.in)
-ENDIF(REVISION)
+ENDIF(DEFINED REVISION)
