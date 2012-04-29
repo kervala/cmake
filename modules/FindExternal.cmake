@@ -7,22 +7,25 @@
 # EXTERNAL_LIBRARY_PATH - where to find external libraries
 # EXTERNAL_FOUND        - True if the external libraries are available
 
-SET(EXTERNAL_TEMP_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external ${CMAKE_CURRENT_SOURCE_DIR}/../external ${CMAKE_CURRENT_SOURCE_DIR}/3rdParty ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty)
-SET(EXTERNAL_TEMP_FILE "include/zlib.h")
 SET(EXTERNAL_NAME "external")
 
-# If using STLport preprend external_stlport
-IF(WITH_STLPORT)
-  SET(EXTERNAL_TEMP_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external_stlport ${CMAKE_CURRENT_SOURCE_DIR}/../external_stlport ${EXTERNAL_TEMP_PATH})
-  SET(EXTERNAL_TEMP_FILE "include/stlport/string")
-  SET(EXTERNAL_NAME "external with STLport")
-ENDIF(WITH_STLPORT)
-
-IF(NOT EXTERNAL_PATH)
+IF(NOT EXTERNAL_PATH AND "$ENV{EXTERNAL_PATH}" MATCHES ".+")
   SET(EXTERNAL_PATH $ENV{EXTERNAL_PATH})
-ENDIF(NOT EXTERNAL_PATH)
+  MESSAGE(STATUS "Using environment variable EXTERNAL_PATH")
+ENDIF(NOT EXTERNAL_PATH AND "$ENV{EXTERNAL_PATH}" MATCHES ".+")
 
 IF(NOT EXTERNAL_PATH)
+  # Search in standard default pathes
+  SET(EXTERNAL_TEMP_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external ${CMAKE_CURRENT_SOURCE_DIR}/../external ${CMAKE_CURRENT_SOURCE_DIR}/3rdParty ${CMAKE_CURRENT_SOURCE_DIR}/../3rdParty)
+  SET(EXTERNAL_TEMP_FILE "include/zlib.h")
+
+  # If using STLport preprend external_stlport
+  IF(WITH_STLPORT)
+    SET(EXTERNAL_TEMP_PATH ${CMAKE_CURRENT_SOURCE_DIR}/external_stlport ${CMAKE_CURRENT_SOURCE_DIR}/../external_stlport ${EXTERNAL_TEMP_PATH})
+    SET(EXTERNAL_TEMP_FILE "include/stlport/string")
+    SET(EXTERNAL_NAME "external with STLport")
+  ENDIF(WITH_STLPORT)
+
   FIND_PATH(EXTERNAL_PATH
     ${EXTERNAL_TEMP_FILE}
     PATHS
