@@ -80,7 +80,6 @@ IF(Mercurial_HG_EXECUTABLE)
         "\\2" ${prefix}_WC_LAST_CHANGED_AUTHOR "${${prefix}_WC_INFO}")
       STRING(REGEX REPLACE "^(.*\n)?date: *([^\n]+).*"
         "\\2" ${prefix}_WC_LAST_CHANGED_DATE "${${prefix}_WC_INFO}")
-
     ENDIF(NOT ${Mercurial_hg_info_result} EQUAL 0)
 
   ENDMACRO(Mercurial_WC_INFO)
