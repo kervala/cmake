@@ -79,7 +79,7 @@ MACRO(SET_TARGET_NASM_LIB TARGET PRODUCT)
   ENDFOREACH(ASM)
 
   # Create a library with all .obj files
-  SET_TARGET_LIB(${TARGET}_asm STATIC ${SRC_ASM} ${OBJ_ASM})
+  SET_TARGET_LIB(${TARGET}_asm PRIVATE ${SRC_ASM} ${OBJ_ASM})
   SET_TARGET_LABEL(${TARGET}_asm "${PRODUCT} Assembler")
 
   # Or else we get an error message
