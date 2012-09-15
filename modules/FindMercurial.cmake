@@ -48,7 +48,8 @@
 #  License text for the above reference.)
 
 FIND_PROGRAM(Mercurial_HG_EXECUTABLE hg
-  DOC "mercurial command line client")
+  DOC "mercurial command line client"
+  HINTS /opt/local/bin)
 MARK_AS_ADVANCED(Mercurial_HG_EXECUTABLE)
 
 IF(Mercurial_HG_EXECUTABLE)

@@ -62,9 +62,8 @@ MACRO(_PCH_GET_COMPILE_FLAGS _out_compile_flags)
 	LIST(APPEND ${_out_compile_flags} ${_directory_definitions})
 	LIST(APPEND ${_out_compile_flags} ${CMAKE_CXX_FLAGS})
 
-	# Format definitions and remove duplicates
+	# Format definitions
 	SEPARATE_ARGUMENTS(${_out_compile_flags})
-	LIST(REMOVE_DUPLICATES ${_out_compile_flags})
 ENDMACRO(_PCH_GET_COMPILE_FLAGS)
 
 MACRO(_PCH_GET_PDB_FILENAME out_filename _target)

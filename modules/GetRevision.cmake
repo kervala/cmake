@@ -4,9 +4,11 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.6.3)
 # SOURCE_DIR should be set to root of your code (where to find CMakeLists.txt)
 
 # Replace spaces by semi-columns
-STRING(REPLACE " " ";" CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH})
+IF(CMAKE_MODULE_PATH)
+  STRING(REPLACE " " ";" CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH})
+ENDIF(CMAKE_MODULE_PATH)
 
-SET(CMAKE_MODULE_PATH  ${SOURCE_DIR}/CMakeModules ${CMAKE_MODULE_PATH})
+SET(CMAKE_MODULE_PATH ${SOURCE_DIR}/CMakeModules ${CMAKE_MODULE_PATH})
 
 IF(NOT ROOT_DIR AND SOURCE_DIR)
   SET(ROOT_DIR ${SOURCE_DIR})
@@ -23,7 +25,8 @@ MACRO(NOW RESULT)
       STRING(REGEX REPLACE ".*\n([0-9][0-9][0-9][0-9])([0-9][0-9])([0-9][0-9])([0-9][0-9])([0-9][0-9])([0-9][0-9]).*" "\\1-\\2-\\3 \\4:\\5:\\6" ${RESULT} "${DATETIME}")
     ENDIF(NOT DATETIME MATCHES "ERROR")
   ELSEIF(UNIX)
-    EXECUTE_PROCESS(COMMAND "date" "+'%Y-%m-%d %H:%M:%S'" OUTPUT_VARIABLE ${RESULT})
+    EXECUTE_PROCESS(COMMAND "date" "+%Y-%m-%d %H:%M:%S" OUTPUT_VARIABLE DATETIME)
+    STRING(REGEX REPLACE "([0-9: -]+).*" "\\1" ${RESULT} "${DATETIME}")
   ELSE (WIN32)
     MESSAGE(SEND_ERROR "date not implemented")
     SET(${RESULT} "0000-00-00 00:00:00")
@@ -52,6 +55,7 @@ ENDIF(EXISTS "${ROOT_DIR}/.hg/")
 
 IF(DEFINED REVISION)
   IF(EXISTS ${SOURCE_DIR}/revision.h.in)
+    MESSAGE(STATUS "Revision: ${REVISION}")
     NOW(BUILD_DATE)
     CONFIGURE_FILE(${SOURCE_DIR}/revision.h.in revision.h.txt)
     EXECUTE_PROCESS(COMMAND ${CMAKE_COMMAND} -E copy revision.h.txt revision.h) # copy_if_different
