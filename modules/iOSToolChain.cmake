@@ -23,6 +23,11 @@
 #   In this case it will always be the most up-to-date SDK found in the CMAKE_IOS_DEVELOPER_ROOT path.
 #   If set manually, this will force the use of a specific SDK version
 
+IF(DEFINED CMAKE_CROSSCOMPILING)
+  # subsequent toolchain loading is not really needed
+  RETURN()
+ENDIF()
+
 # Standard settings
 SET(CMAKE_SYSTEM_NAME Darwin)
 SET(CMAKE_SYSTEM_VERSION 1) # TODO: determine target Darwin version
@@ -151,12 +156,12 @@ ELSE(CMAKE_GENERATOR MATCHES Xcode)
   ENDIF(${IOS_PLATFORM} STREQUAL "OS")
 ENDIF(CMAKE_GENERATOR MATCHES Xcode)
 
-# set the architecture for iOS - using ARCHS_STANDARD_32_BIT sets armv6,armv7 and appears to be XCode's standard. 
+# set the architecture for iOS - using ARCHS_STANDARD_32_BIT sets armv7,armv7s and appears to be XCode's standard. 
 # The other value that works is ARCHS_UNIVERSAL_IPHONE_OS but that sets armv7 only
 set (CMAKE_OSX_ARCHITECTURES ${ARCHS} CACHE string  "Build architecture for iOS")
 
 # Set the find root to the iOS developer roots and to user defined paths
-set (CMAKE_FIND_ROOT_PATH ${CMAKE_IOS_DEVELOPER_ROOT} ${CMAKE_IOS_SDK_ROOT} ${CMAKE_PREFIX_PATH} ${CMAKE_INSTALL_PREFIX} CACHE string  "iOS find search path root")
+set (CMAKE_FIND_ROOT_PATH ${CMAKE_IOS_DEVELOPER_ROOT} ${CMAKE_IOS_SDK_ROOT} ${CMAKE_PREFIX_PATH} ${CMAKE_INSTALL_PREFIX} $ENV{EXTERNAL_IOS_PATH} CACHE string  "iOS find search path root")
 
 # default to searching for frameworks first
 set (CMAKE_FIND_FRAMEWORK FIRST)
