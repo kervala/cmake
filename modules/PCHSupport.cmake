@@ -17,11 +17,11 @@ ELSE(MSVC)
       ARGS ${CMAKE_CXX_COMPILER_ARG1} -dumpversion
       OUTPUT_VARIABLE gcc_compiler_version)
 
-    IF(gcc_compiler_version MATCHES "4\\.1\\.[0-9]+")
+    IF(gcc_compiler_version MATCHES "^4\\.1(\\.[0-9]+)?")
       SET(PCHSupport_FOUND FALSE)
-    ELSEIF(gcc_compiler_version MATCHES "4\\.[0-9]+\\.[0-9]+")
+    ELSEIF(gcc_compiler_version MATCHES "^4\\.[0-9]+(\\.[0-9]+)?")
       SET(PCHSupport_FOUND TRUE)
-    ENDIF(gcc_compiler_version MATCHES "4\\.1\\.[0-9]+")
+    ENDIF(gcc_compiler_version MATCHES "^4\\.1(\\.[0-9]+)?")
   ELSE(CMAKE_COMPILER_IS_GNUCXX)
     # TODO: make tests for other compilers than GCC
     SET(PCHSupport_FOUND TRUE)
