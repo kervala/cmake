@@ -71,13 +71,13 @@ IF(Mercurial_HG_EXECUTABLE)
     IF(NOT ${Mercurial_hg_info_result} EQUAL 0)
       MESSAGE(SEND_ERROR "Command \"${Mercurial_HG_EXECUTABLE} tip --debug\" failed with output:\n${Mercurial_hg_info_error}")
     ELSE(NOT ${Mercurial_hg_info_result} EQUAL 0)
-      STRING(REGEX REPLACE "^(.*\n)?changeset: *([0-9]+):.*"
+      STRING(REGEX REPLACE "^(.*\n)?changeset: *([0-9-]+):.*"
         "\\2" ${prefix}_WC_REVISION "${${prefix}_WC_INFO}")
-      STRING(REGEX REPLACE "^(.*\n)?changeset: *([0-9]+):([0-9a-f]+).*"
+      STRING(REGEX REPLACE "^(.*\n)?changeset: *([0-9-]+):([0-9a-f]+).*"
         "\\3" ${prefix}_WC_CHANGESET "${${prefix}_WC_INFO}")
       STRING(REGEX REPLACE "^(.*\n)?branch: *([^\n]+).*"
         "\\2" ${prefix}_WC_BRANCH "${${prefix}_WC_INFO}")
-      STRING(REGEX REPLACE "^(.*\n)?user: *([^\n]+).*"
+      STRING(REGEX REPLACE "^(.*\n)?user: *([^\n]*).*"
         "\\2" ${prefix}_WC_LAST_CHANGED_AUTHOR "${${prefix}_WC_INFO}")
       STRING(REGEX REPLACE "^(.*\n)?date: *([^\n]+).*"
         "\\2" ${prefix}_WC_LAST_CHANGED_DATE "${${prefix}_WC_INFO}")
