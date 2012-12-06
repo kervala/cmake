@@ -715,7 +715,7 @@ MACRO(SET_TARGET_GUI_EXECUTABLE name)
             COMMAND mkdir -p "${IPA_DIR}/Payload"
             COMMAND strip "${CONTENTS_DIR}/${PRODUCT}"
             COMMAND security unlock-keychain -p "${KEYCHAIN_PASSWORD}"
-            COMMAND CODESIGN_ALLOCATE=${CMAKE_IOS_DEVELOPER_ROOT}/usr/bin/codesign_allocate codesign -fs "${IOS_DEVELOPER}" "--resource-rules=${CONTENTS_DIR}/ResourceRules.plist" --entitlements "${CMAKE_BINARY_DIR}/application.xcent" "${CONTENTS_DIR}"
+            COMMAND CODESIGN_ALLOCATE=${CMAKE_IOS_DEVELOPER_ROOT}/usr/bin/codesign_allocate codesign -fs "${IOS_DISTRIBUTION}" "--resource-rules=${CONTENTS_DIR}/ResourceRules.plist" --entitlements "${CMAKE_BINARY_DIR}/application.xcent" "${CONTENTS_DIR}"
             COMMAND cp -R "${OUTPUT_DIR}" "${IPA_DIR}/Payload"
             COMMAND cp "${_ITUNESARTWORK}" "${IPA_DIR}/iTunesArtwork"
             COMMAND ditto -c -k "${IPA_DIR}" "${IPA}"
@@ -1846,32 +1846,32 @@ MACRO(INIT_BUILD_FLAGS)
         IF(TARGETS_COUNT EQUAL 1)
           IF(TARGET_ARM)
             IF(TARGET_ARMV7S)
-              ADD_PLATFORM_FLAGS("-DHAVE_ARMV7S")
+              ADD_PLATFORM_FLAGS("-arch armv7s -DHAVE_ARMV7S")
             ENDIF(TARGET_ARMV7S)
 
             IF(TARGET_ARMV7)
-              ADD_PLATFORM_FLAGS("-DHAVE_ARMV7")
+              ADD_PLATFORM_FLAGS("-arch armv7 -DHAVE_ARMV7")
             ENDIF(TARGET_ARMV7)
 
             IF(TARGET_ARMV6)
-              ADD_PLATFORM_FLAGS("-DHAVE_ARMV6")
+              ADD_PLATFORM_FLAGS("-arch armv6 -DHAVE_ARMV6")
             ENDIF(TARGET_ARMV6)
 
             IF(TARGET_ARMV5)
-              ADD_PLATFORM_FLAGS("-DHAVE_ARMV5")
+              ADD_PLATFORM_FLAGS("-arch armv5 -DHAVE_ARMV5")
             ENDIF(TARGET_ARMV5)
 
             ADD_PLATFORM_FLAGS("-mthumb -DHAVE_ARM")
           ENDIF(TARGET_ARM)
 
           IF(TARGET_X64)
-            ADD_PLATFORM_FLAGS("-DHAVE_X64 -DHAVE_X86_64 -DHAVE_X86")
+            ADD_PLATFORM_FLAGS("-arch x86_64 -DHAVE_X64 -DHAVE_X86_64 -DHAVE_X86")
           ELSEIF(TARGET_X86)
-            ADD_PLATFORM_FLAGS("-DHAVE_X86")
+            ADD_PLATFORM_FLAGS("-arch i386 -DHAVE_X86")
           ENDIF(TARGET_X64)
 
           IF(TARGET_MIPS)
-            ADD_PLATFORM_FLAGS("-DHAVE_MIPS")
+            ADD_PLATFORM_FLAGS("-arch mips -DHAVE_MIPS")
           ENDIF(TARGET_MIPS)
         ELSEIF(TARGETS_COUNT EQUAL 0)
           # Not using CMAKE_OSX_ARCHITECTURES, HAVE_XXX already defined before
@@ -2262,6 +2262,10 @@ MACRO(SETUP_EXTERNAL)
   IF(WIN32)
     FIND_PACKAGE(External REQUIRED)
 
+    IF(NOT VC_DIR)
+      SET(VC_DIR $ENV{VC_DIR})
+    ENDIF(NOT VC_DIR)
+
     IF(MSVC11)
       IF(NOT MSVC_REDIST_DIR)
         # If you have VC++ 2012 Express, put x64/Microsoft.VC110.CRT/*.dll in ${EXTERNAL_PATH}/redist
@@ -2374,7 +2378,7 @@ MACRO(SETUP_EXTERNAL)
 
       FIND_PACKAGE(WindowsSDK REQUIRED)
       # use VC++ and Windows SDK include paths
-      INCLUDE_DIRECTORIES(${VC_INCLUDE_DIR} ${WINSDK_INCLUDE_DIR})
+      INCLUDE_DIRECTORIES(${VC_INCLUDE_DIR} ${WINSDK_INCLUDE_DIRS})
     ENDIF(MSVC)
   ENDIF(WITH_STLPORT)
 ENDMACRO(SETUP_EXTERNAL)
