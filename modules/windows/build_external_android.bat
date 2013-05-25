@@ -1,7 +1,7 @@
 @echo off
 
-set PATH=%PATH%;%NDK_ROOT%\prebuilt\windows\bin
-set EXTERNAL_ROOT=d:\Neolinks
+set PATH=%PATH%;%NDK_ROOT%\prebuilt\windows-x86_64\bin;%NDK_ROOT%\prebuilt\windows\bin
+set EXTERNAL_ROOT=d:\External
 set TARGET_CPU=armv7
 
 call:compile boost
