@@ -697,7 +697,7 @@ MACRO(SET_TARGET_EXECUTABLE _GUI name)
 
     IF(_QT)
       IF(WIN32)
-        SET(_QT_MODULES Core Gui Network Xml Sql Webkit Script Svg)
+        SET(_QT_MODULES Core Gui Network Xml Sql Webkit Script ScriptTools Svg)
 
         IF(_QT5)
           SET(_QT_MODULES ${_QT_MODULES} Widgets Concurrent)
