@@ -218,7 +218,12 @@ ENDMACRO(SIGN_FILE)
 # 
 # Redistribution and use is allowed according to the terms of the BSD license. 
 # For details see the accompanying COPYING-CMAKE-SCRIPTS file. 
-MACRO (MACRO_ADD_INTERFACES _output_list) 
+MACRO (MACRO_ADD_INTERFACES _output_list)
+  IF(NOT WINSDK_MIDL)
+    MESSAGE(FATAL_ERROR "midl not found, please check your Windows SDK installation")
+    RETURN()
+  ENDIF(NOT WINSDK_MIDL)
+
   FOREACH(_in_FILE ${ARGN}) 
     GET_FILENAME_COMPONENT(_out_FILE ${_in_FILE} NAME_WE) 
     GET_FILENAME_COMPONENT(_in_PATH ${_in_FILE} PATH) 
@@ -231,7 +236,7 @@ MACRO (MACRO_ADD_INTERFACES _output_list)
     ADD_CUSTOM_COMMAND(
       OUTPUT ${_out_header} ${_out_iid}
       DEPENDS ${_in_FILE}
-      COMMAND midl /nologo /char signed /env win32 /Oicf /header ${_out_header_name} /iid ${_out_iid_name} ${_in_FILE}
+      COMMAND ${WINSDK_MIDL} /nologo /char signed /env win32 /Oicf /header ${_out_header_name} /iid ${_out_iid_name} /I ${WINSDK_INCLUDE_DIR} ${_in_FILE}
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
 
@@ -241,7 +246,6 @@ MACRO (MACRO_ADD_INTERFACES _output_list)
     SET_SOURCE_FILES_PROPERTIES(${_in_FILE} PROPERTIES HEADER_FILE_ONLY TRUE)
 
     SET(${_output_list} ${${_output_list}} ${_out_header})
-
   ENDFOREACH(_in_FILE ${ARGN})
 ENDMACRO (MACRO_ADD_INTERFACES)
 
@@ -1457,7 +1461,6 @@ MACRO(INIT_DEFAULT_OPTIONS)
   # Undefined options are set to OFF
   SET_OPTION_DEFAULT(WITH_RTTI ON)
   SET_OPTION_DEFAULT(WITH_EXCEPTIONS ON)
-  SET_OPTION_DEFAULT(WITH_LOGGING ON)
   SET_OPTION_DEFAULT(WITH_PCH ON)
   SET_OPTION_DEFAULT(WITH_INSTALL_LIBRARIES ON)
 
@@ -1758,7 +1761,7 @@ MACRO(INIT_BUILD_FLAGS)
       MESSAGE(FATAL_ERROR "Can't determine compiler version ${MSVC_VERSION}")
     ENDIF(MSVC11)
 
-    ADD_PLATFORM_FLAGS("/D_CRT_SECURE_NO_DEPRECATE /D_CRT_SECURE_NO_WARNINGS /D_CRT_NONSTDC_NO_WARNINGS /D_WIN32 /DWIN32 /D_WINDOWS /wd4250")
+    ADD_PLATFORM_FLAGS("/D_CRT_SECURE_NO_DEPRECATE /D_CRT_SECURE_NO_WARNINGS /D_CRT_NONSTDC_NO_WARNINGS /D_SCL_SECURE_NO_WARNINGS /D_WIN32 /DWIN32 /D_WINDOWS /wd4250")
 
     IF(WITH_PCH_MAX_SIZE)
       ADD_PLATFORM_FLAGS("/Zm1000")
@@ -2327,13 +2330,13 @@ MACRO(SETUP_EXTERNAL)
     ENDIF(CMAKE_DL_LIBS)
   ENDIF(WIN32)
 
-  FIND_PACKAGE(Threads)
-
   # Android and iOS have pthread  
   IF(ANDROID OR IOS)
     SET(CMAKE_USE_PTHREADS_INIT 1)
     SET(Threads_FOUND TRUE)
   ELSE(ANDROID OR IOS)
+    SET(THREADS_HAVE_PTHREAD_ARG ON)
+    FIND_PACKAGE(Threads)
     # TODO: replace all -l<lib> by absolute path to <lib> in CMAKE_THREAD_LIBS_INIT
   ENDIF(ANDROID OR IOS)
 
