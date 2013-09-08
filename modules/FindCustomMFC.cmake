@@ -45,6 +45,9 @@ IF(MFC_FOUND)
 
   # Set definitions for using MFC in DLL
   SET(MFC_DEFINITIONS -D_AFXDLL)
+
+  # Set CMake flag to use MFC DLL
+  SET(CMAKE_MFC_FLAG 2)
 ENDIF(MFC_FOUND)
 
 # TODO: create a macro which set MFC_DEFINITIONS, MFC_LIBRARY_DIR and MFC_INCLUDE_DIR for a project
