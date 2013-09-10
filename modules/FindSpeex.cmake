@@ -1,8 +1,8 @@
-FIND_PACKAGE_HELPER(Speex speex/speex.h speex speexd)
+FIND_PACKAGE_HELPER(Speex speex/speex.h)
 
 IF(SPEEX_FOUND)
   SET(SPEEXDSP_DIR ${SPEEX_DIR})
-  FIND_PACKAGE_HELPER(SpeexDSP speex/speex_resampler.h speexdsp speexdspd)
+  FIND_PACKAGE_HELPER(SpeexDSP speex/speex_resampler.h)
 
   IF(SPEEXDSP_FOUND)
     SET(SPEEX_LIBRARIES ${SPEEX_LIBRARIES} ${SPEEXDSP_LIBRARIES})

@@ -1,1 +1,7 @@
-FIND_PACKAGE_HELPER(FMOD fmod.h "fmod;fmodvc;fmod64" "fmodd;fmodvcd;fmod64d" "fmod;fmod3")
+IF(TARGET_X64)
+  SET(FMOD_BASE fmod64)
+ELSE(TARGET_X64)
+  SET(FMOD_BASE fmodvc)
+ENDIF(TARGET_X64)
+
+FIND_PACKAGE_HELPER(FMOD fmod.h RELEASE ${FMOD_BASE} DEBUG ${FMOD_BASE}d SUFFIXES fmod3)

@@ -1,1 +1,1 @@
-FIND_PACKAGE_HELPER(Xvid xvid.h xvidcore xvidcored)
+FIND_PACKAGE_HELPER(Xvid xvid.h RELEASE xvidcore DEBUG xvidcored)

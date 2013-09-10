@@ -1,5 +1,5 @@
-FIND_PACKAGE_HELPER(Vorbis vorbisenc.h vorbis vorbisd)
-FIND_PACKAGE_HELPER(VorbisFile vorbisfile.h vorbisfile vorbisfiled vorbis)
+FIND_PACKAGE_HELPER(Vorbis vorbisenc.h)
+FIND_PACKAGE_HELPER(VorbisFile vorbisfile.h SUFFIXES vorbis)
 
 IF(VORBISFILE_FOUND)
   SET(VORBIS_LIBRARIES ${VORBIS_LIBRARIES} ${VORBISFILE_LIBRARIES})

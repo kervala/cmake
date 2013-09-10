@@ -1,5 +1,6 @@
 SET(COMMON_MODULE_FOUND TRUE)
 SET(ALL_TARGETS)
+SET(VERSION_UPDATED OFF)
 
 # Force Release configuration for compiler checks
 SET(CMAKE_TRY_COMPILE_CONFIGURATION "Release")
@@ -12,10 +13,9 @@ IF(NOT DESKTOP_FILE)
   SET(DESKTOP_FILE ${CMAKE_BINARY_DIR})
 ENDIF(NOT DESKTOP_FILE)
 
-# Force Debug configuration if launched from Qt Creator
-IF(NOT CMAKE_BUILD_TYPE AND DESKTOP_FILE MATCHES "qtcreator")
-  SET(CMAKE_BUILD_TYPE "Debug" CACHE STRING "" FORCE)
-ENDIF(NOT CMAKE_BUILD_TYPE AND DESKTOP_FILE MATCHES "qtcreator")
+INCLUDE(QtSupport)
+INCLUDE(MacSupport)
+INCLUDE(WinSupport)
 
 # Force Release configuration by default
 IF(NOT CMAKE_BUILD_TYPE)
@@ -135,16 +135,36 @@ MACRO(GEN_REVISION_H)
   ENDIF(EXISTS ${CMAKE_SOURCE_DIR}/revision.h.in)
 ENDMACRO(GEN_REVISION_H)
 
-MACRO(PARSE_VERSION FILENAME VAR_MAJOR VAR_MINOR VAR_PATCH)
-  IF(EXISTS ${FILENAME})
-    FILE(STRINGS ${FILENAME} VERSION_MAJOR REGEX "^#define ${VAR_MAJOR} ([0-9]+)$")
-    FILE(STRINGS ${FILENAME} VERSION_MINOR REGEX "^#define ${VAR_MINOR} ([0-9]+)$")
-    FILE(STRINGS ${FILENAME} VERSION_PATCH REGEX "^#define ${VAR_PATCH} ([0-9]+)$")
+FUNCTION(JOIN VALUES GLUE OUTPUT)
+  STRING(REGEX REPLACE "([^\\]|^);" "\\1${GLUE}" _TMP_STR "${VALUES}")
+  STRING(REGEX REPLACE "[\\](.)" "\\1" _TMP_STR "${_TMP_STR}") #fixes escaping
+  SET(${OUTPUT} "${_TMP_STR}" PARENT_SCOPE)
+ENDFUNCTION()
 
-    STRING(REGEX REPLACE "^#define ${VAR_MAJOR} ([0-9]+)$" "\\1" VERSION_MAJOR "${VERSION_MAJOR}")
-    STRING(REGEX REPLACE "^#define ${VAR_MINOR} ([0-9]+)$" "\\1" VERSION_MINOR "${VERSION_MINOR}")
-    STRING(REGEX REPLACE "^#define ${VAR_PATCH} ([0-9]+)$" "\\1" VERSION_PATCH "${VERSION_PATCH}")
+MACRO(PARSE_VERSION_OTHER FILENAME)
+  IF(EXISTS ${FILENAME})
+    SET(_FILTER_ARRAY ${ARGN})
+    JOIN("${_FILTER_ARRAY}" "|" _FILTER_REGEX)
+    FILE(STRINGS ${FILENAME} _FILE REGEX "(${_FILTER_REGEX})[ \t=\"]+([0-9.]+)")
+
+    IF(_FILE)
+      FOREACH(_VAR ${_FILTER_ARRAY})
+        STRING(REGEX REPLACE "^.*${_VAR}[ \t=\"]+([0-9.]+).*$" "\\1" ${_VAR} "${_FILE}")
+        IF(NOT ${_VAR} AND NOT STREQUAL "0")
+          SET(${_VAR} 0)
+        ENDIF(NOT ${_VAR} AND NOT STREQUAL "0")
+      ENDFOREACH(_VAR ${_FILTER_ARRAY})
+    ENDIF(_FILE)
   ENDIF(EXISTS ${FILENAME})
+ENDMACRO(PARSE_VERSION_OTHER)
+
+MACRO(PARSE_VERSION FILENAME VAR_MAJOR VAR_MINOR VAR_PATCH)
+  PARSE_VERSION_OTHER(${FILENAME} ${VAR_MAJOR} ${VAR_MINOR} ${VAR_PATCH})
+  SET(VERSION_MAJOR ${${VAR_MAJOR}})
+  SET(VERSION_MINOR ${${VAR_MINOR}})
+  SET(VERSION_PATCH ${${VAR_PATCH}})
+  
+#  MESSAGE(STATUS "${VERSION_MAJOR} ${VERSION_MINOR} ${VERSION_PATCH}")
 ENDMACRO(PARSE_VERSION)
 
 MACRO(PARSE_VERSION_STRING VERSION_STRING _VAR_MAJOR _VAR_MINOR _VAR_PATCH)
@@ -176,78 +196,13 @@ MACRO(CONVERT_VERSION_NUMBER VAR_MAJOR VAR_MINOR VAR_PATCH _VERSION_NUMBER)
 ENDMACRO(CONVERT_VERSION_NUMBER)
 
 MACRO(SIGN_FILE target)
-  IF(WITH_SIGN_FILE AND WIN32 AND WINSDK_SIGNTOOL AND ${CMAKE_BUILD_TYPE} STREQUAL "Release")
-    GET_TARGET_PROPERTY(filename ${target} LOCATION)
-#    ADD_CUSTOM_COMMAND(
-#      TARGET ${target}
-#      POST_BUILD
-#      COMMAND ${WINSDK_SIGNTOOL} sign ${filename}
-#      VERBATIM)
-  ENDIF(WITH_SIGN_FILE AND WIN32 AND WINSDK_SIGNTOOL AND ${CMAKE_BUILD_TYPE} STREQUAL "Release")
-
+  IF(WIN32)
+    SIGN_FILE_WINDOWS(${target})
+  ENDIF(WIN32)
   IF(APPLE)
-    IF(IOS)
-      IF(NOT IOS_DEVELOPER)
-        SET(IOS_DEVELOPER "iPhone Developer")
-      ENDIF(NOT IOS_DEVELOPER)
-      IF(NOT IOS_DISTRIBUTION)
-        SET(IOS_DISTRIBUTION "${IOS_DEVELOPER}")
-      ENDIF(NOT IOS_DISTRIBUTION)
-      SET_TARGET_PROPERTIES(${target} PROPERTIES
-        XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY[variant=Debug] ${IOS_DEVELOPER}
-        XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY[variant=Release] ${IOS_DISTRIBUTION}
-        XCODE_ATTRIBUTE_INSTALL_PATH "$(LOCAL_APPS_DIR)"
-        XCODE_ATTRIBUTE_INSTALL_PATH_VALIDATE_PRODUCT "YES"
-        XCODE_ATTRIBUTE_COMBINE_HIDPI_IMAGES "NO")
-    ELSE(IOS)
-#      SET_TARGET_PROPERTIES(${target} PROPERTIES
-#        XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Mac Developer")
-    ENDIF(IOS)
+    SIGN_FILE_MAC(${target})
   ENDIF(APPLE)
 ENDMACRO(SIGN_FILE)
-
-################################################################################ 
-# MACRO_ADD_INTERFACES(idl_files...) 
-# 
-# Syntax: MACRO_ADD_INTERFACES(<output list> <idl1> [<idl2> [...]]) 
-# Notes: <idl1> should be absolute paths so the MIDL compiler can find them. 
-# For every idl file xyz.idl, two files xyz_h.h and xyz.c are generated, which 
-# are added to the <output list> 
-
-# Copyright (c) 2007, Guilherme Balena Versiani, <[EMAIL PROTECTED]> 
-# 
-# Redistribution and use is allowed according to the terms of the BSD license. 
-# For details see the accompanying COPYING-CMAKE-SCRIPTS file. 
-MACRO (MACRO_ADD_INTERFACES _output_list)
-  IF(NOT WINSDK_MIDL)
-    MESSAGE(FATAL_ERROR "midl not found, please check your Windows SDK installation")
-    RETURN()
-  ENDIF(NOT WINSDK_MIDL)
-
-  FOREACH(_in_FILE ${ARGN}) 
-    GET_FILENAME_COMPONENT(_out_FILE ${_in_FILE} NAME_WE) 
-    GET_FILENAME_COMPONENT(_in_PATH ${_in_FILE} PATH) 
-
-    SET(_out_header_name ${_out_FILE}.h)
-    SET(_out_header ${CMAKE_CURRENT_BINARY_DIR}/${_out_header_name})
-    SET(_out_iid_name ${_out_FILE}_i.c)
-    SET(_out_iid ${CMAKE_CURRENT_BINARY_DIR}/${_out_iid_name})
-    #message("_out_header_name=${_out_header_name}, _out_header=${_out_header}, _out_iid=${_out_iid}")
-    ADD_CUSTOM_COMMAND(
-      OUTPUT ${_out_header} ${_out_iid}
-      DEPENDS ${_in_FILE}
-      COMMAND ${WINSDK_MIDL} /nologo /char signed /env win32 /Oicf /header ${_out_header_name} /iid ${_out_iid_name} /I ${WINSDK_INCLUDE_DIR} ${_in_FILE}
-      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    )
-
-    SET_PROPERTY(SOURCE ${_out_header} APPEND PROPERTY OBJECT_DEPENDS ${_in_FILE})
-
-    SET_SOURCE_FILES_PROPERTIES(${_out_header} ${_out_iid} PROPERTIES GENERATED TRUE)
-    SET_SOURCE_FILES_PROPERTIES(${_in_FILE} PROPERTIES HEADER_FILE_ONLY TRUE)
-
-    SET(${_output_list} ${${_output_list}} ${_out_header})
-  ENDFOREACH(_in_FILE ${ARGN})
-ENDMACRO (MACRO_ADD_INTERFACES)
 
 MACRO(SET_TARGET_SERVICE name)
   IF(NOT BUILD_FLAGS_SETUP)
@@ -261,6 +216,65 @@ MACRO(SET_TARGET_SERVICE name)
   SIGN_FILE(${name})
 ENDMACRO(SET_TARGET_SERVICE)
 
+MACRO(CREATE_SOURCE_GROUPS DIR FILES)
+  SET(_NAMES)
+  SET(_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+  SET(_GENERATED_DIR ${CMAKE_BINARY_DIR})
+
+  FOREACH(_FILE ${FILES})
+    # Get only directory from filename
+    GET_FILENAME_COMPONENT(_DIR ${_FILE} PATH)
+    
+    SET(_NAME)
+    SET(_GROUP)
+
+    IF(_DIR)
+      IF(_DIR MATCHES "${_GENERATED_DIR}")
+        SET(_NAME "GENERATED")
+        SET(_GROUP "generated")
+      ELSE(_DIR MATCHES "${_GENERATED_DIR}")
+        # Get relative path from CMake current directory
+        FILE(RELATIVE_PATH _DIR ${_ROOT_DIR} ${_DIR})
+
+        IF(_DIR)
+          # Remove all parents directories
+          STRING(REPLACE "../" "" _DIR ${_DIR})
+
+          IF(_DIR)
+            # Replace / by _ to use as variable name part
+            STRING(REPLACE "/" "_" _NAME ${_DIR})
+            STRING(REPLACE "/" "\\" _GROUP ${_DIR})
+          ENDIF(_DIR)
+        ENDIF(_DIR)
+      ENDIF(_DIR MATCHES "${_GENERATED_DIR}")
+    ENDIF(_DIR)
+    
+    IF(NOT _NAME)
+      SET(_NAME "ROOT")
+    ENDIF(NOT _NAME)
+
+    IF(_GROUP)
+      IF(NOT _GROUP STREQUAL ${DIR} AND NOT _GROUP MATCHES "^(${DIR}/|generated)")
+        SET(_GROUP "${DIR}\\${_GROUP}")
+      ENDIF(NOT _GROUP STREQUAL ${DIR} AND NOT _GROUP MATCHES "^(${DIR}/|generated)")
+    ELSE(_GROUP)
+      SET(_GROUP "${DIR}")
+    ENDIF(_GROUP)
+
+    LIST(APPEND _NAMES ${_NAME})
+    LIST(APPEND ${_NAME}_FILES ${_FILE})
+    SET(${_NAME}_GROUP ${_GROUP})
+  ENDFOREACH(_FILE)
+
+  IF(_NAMES)
+    LIST(REMOVE_DUPLICATES _NAMES)
+
+    FOREACH(_NAME ${_NAMES})
+      SOURCE_GROUP("${${_NAME}_GROUP}" FILES ${${_NAME}_FILES})
+    ENDFOREACH(_NAME)
+  ENDIF(_NAMES)
+ENDMACRO(CREATE_SOURCE_GROUPS)
+
 MACRO(SET_TARGET_EXECUTABLE _GUI name)
   SET(GUI "${_GUI}")
 
@@ -271,91 +285,38 @@ MACRO(SET_TARGET_EXECUTABLE _GUI name)
   SET(_SOURCES)
   SET(_HEADERS)
   SET(_RESOURCES)
-  SET(_XIBS)
-  SET(_STRINGS)
-  SET(_ICNSS)
-  SET(_INFO_PLIST)
-  SET(_LANGS)
-  SET(_ITUNESARTWORK)
   SET(_MISCS)
-  SET(_FRAMEWORKS)
   SET(_RCS)
   SET(_IDLS)
   SET(_GENERATED_IDLS)
+  SET(_NO_GROUPS OFF)
 
-  # Qt
-  SET(_TSS)
-  SET(_QRCS)
-  SET(_UIS)
-
-  SET(QT_SOURCES)
-  SET(QT_MOCS)
-  SET(QT_HEADERS)
-  SET(QT_QRCS)
-  SET(QT_QMS)
+  DETECT_QT_VERSION()
+  INIT_MAC()
 
   FOREACH(ARG ${ARGN})
     IF(ARG MATCHES "\\.(cpp|mm|m|c|cxx|cc)$")
       LIST(APPEND _SOURCES ${ARG})
     ELSEIF(ARG MATCHES "\\.(h|pch|hpp|hh|hxx)$")
       LIST(APPEND _HEADERS ${ARG})
+    ELSEIF(ARG STREQUAL NO_GROUPS)
+      SET(_NO_GROUPS ON)
     ELSE(ARG MATCHES "\\.(cpp|mm|m|c|cxx|cc)$")
       SET(_INCLUDE ON)
-      IF(ARG MATCHES "\\.xib$")
-        LIST(APPEND _XIBS ${ARG})
-        IF(NOT XCODE)
-          # Don't include XIB with makefiles because we only need NIB
-          SET(_INCLUDE OFF)
-        ENDIF(NOT XCODE)
+      IF(ARG MATCHES ${MAC_FILES_FILTER})
+        FILTER_MAC_FILES(${ARG})
       ELSEIF(ARG MATCHES "\\.idl$")
         LIST(APPEND _IDLS ${ARG})
-      ELSEIF(ARG MATCHES "\\.strings$")
-        LIST(APPEND _STRINGS ${ARG})
-      ELSEIF(ARG MATCHES "iTunesArtwork\\.png$")
-          # Don't include iTunesArtwork because it'll be copied in IPA
-          SET(_INCLUDE OFF)
-          SET(_ITUNESARTWORK ${ARG})
-      ELSEIF(ARG MATCHES "\\.ts$")
-        STRING(REGEX REPLACE "^.*_([a-z-]*)\\.ts$" "\\1" _LANG ${ARG})
-        LIST(APPEND _LANGS ${_LANG})
-        LIST(APPEND _TSS ${ARG})
+      ELSEIF(ARG MATCHES ${QT_FILES_FILTER})
+        FILTER_QT_FILES(${ARG})
       ELSEIF(ARG MATCHES "\\.rc$")
         LIST(APPEND _RCS ${ARG})
-      ELSEIF(ARG MATCHES "\\.qrc$")
-        LIST(APPEND _QRCS ${ARG})
-      ELSEIF(ARG MATCHES "\\.ui$")
-        LIST(APPEND _UIS ${ARG})
-      ELSEIF(ARG MATCHES "\\.(icns|ico)$")
+      ELSEIF(ARG MATCHES "\\.ico$")
         LIST(APPEND _ICNSS ${ARG})
-      ELSEIF(ARG MATCHES "Info([a-z0-9_-]*)\\.plist$")
-        # Don't include Info.plist because it'll be generated
-        LIST(APPEND _INFO_PLIST ${ARG})
-        SET(_INCLUDE OFF)
-      ELSEIF(ARG MATCHES "\\.framework$")
-        LIST(APPEND _FRAMEWORKS ${ARG})
-        SET(_INCLUDE OFF)
-      ELSE(ARG MATCHES "\\.xib$")
+      ELSE(ARG MATCHES ${MAC_FILES_FILTER})
         # Miscellaneous file
         LIST(APPEND _MISCS ${ARG})
-      ENDIF(ARG MATCHES "\\.xib$")
-      IF(ARG MATCHES "/([a-z]+)\\.lproj/")
-        # Extract ISO code for language from source directory
-        STRING(REGEX REPLACE "^.*/([a-z]+)\\.lproj/.*$" "\\1" _LANG ${ARG})
-
-        # Append new language if not already in the list
-        LIST(FIND _LANGS "${_LANG}" _INDEX)
-        IF(_INDEX EQUAL -1)
-          LIST(APPEND _LANGS ${_LANG})
-        ENDIF(_INDEX EQUAL -1)
-
-        # Append file to localized resources list
-        LIST(APPEND _RESOURCES_${_LANG} ${ARG})
-      ELSE(ARG MATCHES "/([a-z]+)\\.lproj/")
-        # Append file to neutral resources list
-        IF(_INCLUDE)
-          LIST(APPEND _RESOURCES_NEUTRAL ${ARG})
-        ENDIF(_INCLUDE)
-      ENDIF(ARG MATCHES "/([a-z]+)\\.lproj/")
+      ENDIF(ARG MATCHES ${MAC_FILES_FILTER})
 
       IF(_INCLUDE)
         LIST(APPEND _RESOURCES ${ARG})
@@ -381,400 +342,51 @@ MACRO(SET_TARGET_EXECUTABLE _GUI name)
     ENDIF(NOT _RCS AND HAVE_CONFIG_H)
   ENDIF(WIN32)
 
-  IF(DEFINED QT_WRAP_CPP)
-    SET(_QT4 ON)
-  ENDIF(DEFINED QT_WRAP_CPP)
-
-  IF(DEFINED Qt5Core_VERSION_STRING)
-    SET(_QT5 ON)
-    SET(QT_BINARY_DIR "${_qt5Core_install_prefix}/bin")
-    SET(QT_PLUGINS_DIR "${_qt5Core_install_prefix}/plugins")
-    SET(QT_TRANSLATIONS_DIR "${_qt5Core_install_prefix}/translations")
-  ENDIF(DEFINED Qt5Core_VERSION_STRING)
-
-  IF(_QT4 OR _QT5)
-    SET(_QT ON)
-  ENDIF(_QT4 OR _QT5)
-
   # Specific Qt macros
-  IF(_QT)
-    IF(_TSS)
-      SET_SOURCE_FILES_PROPERTIES(${_TSS} PROPERTIES OUTPUT_LOCATION "${CMAKE_BINARY_DIR}/translations")
+  COMPILE_QT_TRANSLATIONS(${_SOURCES} ${_HEADERS})
+  COMPILE_QT_RESOURCES()
+  COMPILE_QT_UIS()
+  COMPILE_QT_HEADERS(${name} ${_HEADERS})
+  
+  SET_QT_SOURCES()
 
-      IF(WITH_UPDATE_TRANSLATIONS)
-        SET(_TRANS ${_SOURCES} ${_HEADERS} ${_UIS})
-        IF(_QT5)
-          QT5_CREATE_TRANSLATION(QT_QMS ${_TRANS} ${_TSS})
-        ELSE(_QT5)
-          QT4_CREATE_TRANSLATION(QT_QMS ${_TRANS} ${_TSS})
-        ENDIF(_QT5)
-      ELSE(WITH_UPDATE_TRANSLATIONS)
-        IF(_QT5)
-          QT5_ADD_TRANSLATION(QT_QMS ${_TSS})
-        ELSE(_QT5)
-          QT4_ADD_TRANSLATION(QT_QMS ${_TSS})
-        ENDIF(_QT5)
-      ENDIF(WITH_UPDATE_TRANSLATIONS)
+  IF(NOT _NO_GROUPS)
+    CREATE_SOURCE_GROUPS(src "${_SOURCES};${_HEADERS}")
+  ENDIF(NOT _NO_GROUPS)
 
-      SOURCE_GROUP("translations" FILES ${_TSS})
-    ENDIF(_TSS)
-
-    IF(_QRCS)
-      # Generate .cpp from .qrc
-      IF(_QT5)
-        QT5_ADD_RESOURCES(QT_QRCS ${_QRCS})
-      ELSE(_QT5)
-        QT4_ADD_RESOURCES(QT_QRCS ${_QRCS})
-      ENDIF(_QT5)
-    ENDIF(_QRCS)
-
-    IF(_UIS)
-      # Generate .h from .ui
-      IF(_QT5)
-        QT5_WRAP_UI(QT_HEADERS ${_UIS})
-      ELSE(_QT5)
-        QT4_WRAP_UI(QT_HEADERS ${_UIS})
-      ENDIF(_QT5)
-      
-      SOURCE_GROUP("ui" FILES ${_UIS})
-    ENDIF(_UIS)
-
-    IF(_HEADERS AND NOT CMAKE_AUTOMOC)
-      # Generate .cxx from .h witout notice messages
-      IF(_QT5)
-        QT5_WRAP_CPP(QT_MOCS ${_HEADERS} OPTIONS -nn)
-      ELSE(_QT5)
-        QT4_WRAP_CPP(QT_MOCS ${_HEADERS} OPTIONS -nn)
-      ENDIF(_QT5)
-    ENDIF(_HEADERS AND NOT CMAKE_AUTOMOC)
-
-    # Qt generated files
-    SET(QT_SOURCES ${QT_MOCS} ${QT_HEADERS} ${QT_QRCS} ${QT_QMS})
-
-    IF(QT_SOURCES)
-      SOURCE_GROUP("generated" FILES ${QT_SOURCES})
-    ENDIF(QT_SOURCES)
-  ENDIF(_QT)
-
-  SOURCE_GROUP("src" FILES ${_HEADERS} ${_SOURCES})
-
-  IF(_RCS OR _QRCS OR _ICNSS)
-    SOURCE_GROUP("res" FILES ${_RCS} ${_QRCS} ${_ICNSS})
-  ENDIF(_RCS OR _QRCS OR _ICNSS)
+  IF(_RCS OR QT_QRCS OR _ICNSS)
+    SOURCE_GROUP("res" FILES ${_RCS} ${QT_QRCS} ${_ICNSS})
+  ENDIF(_RCS OR QT_QRCS OR _ICNSS)
 
   IF(GUI)
-    ADD_EXECUTABLE(${name} WIN32 MACOSX_BUNDLE ${_SOURCES} ${_HEADERS} ${QT_SOURCES} ${_RESOURCES} ${_FRAMEWORKS} ${_GENERATED_IDLS})
-  ELSE(GUI)
-    ADD_EXECUTABLE(${name} ${_SOURCES} ${_HEADERS} ${QT_SOURCES} ${_RESOURCES} ${_FRAMEWORKS})
+    SET(_SOURCES WIN32 MACOSX_BUNDLE ${_SOURCES})
   ENDIF(GUI)
+
+  ADD_EXECUTABLE(${name} ${_SOURCES} ${_HEADERS} ${QT_SOURCES} ${_RESOURCES} ${_FRAMEWORKS} ${_GENERATED_IDLS})
+
+  LINK_QT_LIBRARIES(${name})
 
   SET_TARGET_FLAGS(${name})
   SET_SOURCES_FLAGS("${_SOURCES}")
 
   IF(APPLE AND GUI)
-    IF(XCODE)
-      SET(OUTPUT_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$(CONFIGURATION)/${PRODUCT_FIXED}.app)
-    ELSE(XCODE)
-      SET(OUTPUT_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PRODUCT_FIXED}.app)
-    ENDIF(XCODE)
-
-    IF(NOT IOS)
-      SET(_SUBDIR "mac")
-      SET(CONTENTS_DIR ${OUTPUT_DIR}/Contents)
-      SET(RESOURCES_DIR ${CONTENTS_DIR}/Resources)
-    ELSE(NOT IOS)
-      SET(_SUBDIR "ios")
-      SET(CONTENTS_DIR ${OUTPUT_DIR})
-      SET(RESOURCES_DIR ${CONTENTS_DIR})
-    ENDIF(NOT IOS)
-
-    IF(NOT MAC_RESOURCES_DIR)
-      FOREACH(ITEM ${CMAKE_MODULE_PATH})
-        IF(EXISTS "${ITEM}/${_SUBDIR}/Info.plist")
-          SET(MAC_RESOURCES_DIR "${ITEM}/${_SUBDIR}")
-          BREAK()
-        ENDIF(EXISTS "${ITEM}/${_SUBDIR}/Info.plist")
-      ENDFOREACH(ITEM)
-    ENDIF(NOT MAC_RESOURCES_DIR)
-
-    IF(NOT MACOSX_BUNDLE_INFO_STRING)
-      SET(MACOSX_BUNDLE_INFO_STRING ${PRODUCT})
-    ENDIF(NOT MACOSX_BUNDLE_INFO_STRING)
-
-    IF(NOT MACOSX_BUNDLE_LONG_VERSION_STRING)
-      SET(MACOSX_BUNDLE_LONG_VERSION_STRING "${PRODUCT} version ${VERSION}")
-    ENDIF(NOT MACOSX_BUNDLE_LONG_VERSION_STRING)
-
-    IF(NOT MACOSX_BUNDLE_BUNDLE_NAME)
-      SET(MACOSX_BUNDLE_BUNDLE_NAME ${PRODUCT})
-    ENDIF(NOT MACOSX_BUNDLE_BUNDLE_NAME)
-
-    IF(NOT MACOSX_BUNDLE_SHORT_VERSION_STRING)
-      SET(MACOSX_BUNDLE_SHORT_VERSION_STRING ${VERSION})
-    ENDIF(NOT MACOSX_BUNDLE_SHORT_VERSION_STRING)
-
-    IF(NOT MACOSX_BUNDLE_BUNDLE_VERSION)
-      SET(MACOSX_BUNDLE_BUNDLE_VERSION ${VERSION})
-    ENDIF(NOT MACOSX_BUNDLE_BUNDLE_VERSION)
-
-    IF(NOT MACOSX_BUNDLE_COPYRIGHT)
-      SET(MACOSX_BUNDLE_COPYRIGHT "Copyright ${YEAR} ${AUTHOR}")
-    ENDIF(NOT MACOSX_BUNDLE_COPYRIGHT)
-
-    # Make sure the 'Resources' Directory is correctly created before we build
-    ADD_CUSTOM_COMMAND(TARGET ${name} PRE_BUILD COMMAND mkdir -p ${RESOURCES_DIR})
-    
-    # Copy all resources in Resources folder
-    IF(_RESOURCES)
-      IF(_RESOURCES_NEUTRAL)
-        SOURCE_GROUP(Resources FILES ${_RESOURCES_NEUTRAL})
-        IF(XCODE)
-          # Resources are copied by Xcode
-          SET_SOURCE_FILES_PROPERTIES(${_RESOURCES_NEUTRAL} PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-        ELSE(XCODE)
-          # We need to copy resources manually
-          FOREACH(_RES ${_RESOURCES_NEUTRAL})
-            ADD_CUSTOM_COMMAND(TARGET ${name} PRE_BUILD COMMAND cp ARGS ${_RES} ${RESOURCES_DIR})
-          ENDFOREACH(_RES ${_RESOURCES_NEUTRAL})
-        ENDIF(XCODE)
-      ENDIF(_RESOURCES_NEUTRAL)
-      IF(_LANGS)
-        FOREACH(_LANG ${_LANGS})
-          # Create the directory containing specific language resources
-          ADD_CUSTOM_COMMAND(TARGET ${name} PRE_BUILD COMMAND mkdir -p ${RESOURCES_DIR}/${_LANG}.lproj)
-          SOURCE_GROUP("Resources\\${_LANG}.lproj" FILES ${_RESOURCES_${_LANG}})
-          FOREACH(_RES ${_RESOURCES_${_LANG}})
-            # Copy only Localizable.strings because XIB need to be converted to NIB
-            IF(_RES MATCHES "/Localizable.strings$")
-              ADD_CUSTOM_COMMAND(TARGET ${name} PRE_BUILD COMMAND cp ARGS ${_RES} ${RESOURCES_DIR}/${_LANG}.lproj)
-            ENDIF(_RES MATCHES "/Localizable.strings$")
-          ENDFOREACH(_RES ${_RESOURCES_${_LANG}})
-        ENDFOREACH(_LANG ${_LANGS})
-      ENDIF(_LANGS)
-    ENDIF(_RESOURCES)
-
-    # Set a custom plist file for the app bundle
-    IF(MAC_RESOURCES_DIR)
-      IF(NOT _INFO_PLIST)
-        SET(_INFO_PLIST ${MAC_RESOURCES_DIR}/Info.plist)
-      ENDIF(NOT _INFO_PLIST)
-
-      SET_TARGET_PROPERTIES(${name} PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${_INFO_PLIST})
-
-      IF(NOT XCODE)
-        ADD_CUSTOM_COMMAND(TARGET ${name} POST_BUILD COMMAND cp ARGS ${MAC_RESOURCES_DIR}/PkgInfo ${CONTENTS_DIR})
-      ENDIF(NOT XCODE)
-    ENDIF(MAC_RESOURCES_DIR)
-
-    # Compile the .xib files using the 'ibtool' program with the destination being the app package
-    IF(_XIBS)
-      IF(NOT XCODE)
-        # Make sure we can find the 'ibtool' program. If we can NOT find it we skip generation of this project
-        FIND_PROGRAM(IBTOOL ibtool HINTS "/usr/bin" "${OSX_DEVELOPER_ROOT}/usr/bin" NO_CMAKE_FIND_ROOT_PATH)
-
-        IF(${IBTOOL} STREQUAL "IBTOOL-NOTFOUND")
-          MESSAGE(SEND_ERROR "ibtool can not be found and is needed to compile the .xib files. It should have been installed with the Apple developer tools. The default system paths were searched in addition to ${OSX_DEVELOPER_ROOT}/usr/bin")
-        ENDIF(${IBTOOL} STREQUAL "IBTOOL-NOTFOUND")
-
-        FOREACH(XIB ${_XIBS})
-          IF(XIB MATCHES "\\.lproj")
-            STRING(REGEX REPLACE "^.*/(([a-z]+)\\.lproj/([a-zA-Z0-9_-]+))\\.xib$" "\\1.nib" NIB ${XIB})
-          ELSE(XIB MATCHES "\\.lproj")
-            STRING(REGEX REPLACE "^.*/([a-zA-Z0-9_-]+)\\.xib$" "\\1.nib" NIB ${XIB})
-          ENDIF(XIB MATCHES "\\.lproj")
-          GET_FILENAME_COMPONENT(NIB_OUTPUT_DIR ${RESOURCES_DIR}/${NIB} PATH)
-          ADD_CUSTOM_COMMAND(TARGET ${name} POST_BUILD
-            COMMAND ${IBTOOL} --errors --warnings --notices --output-format human-readable-text
-              --compile ${RESOURCES_DIR}/${NIB}
-              ${XIB}
-              --sdk ${CMAKE_IOS_SDK_ROOT}
-            COMMENT "Building XIB object ${NIB}")
-        ENDFOREACH(XIB)
-      ENDIF(NOT XCODE)
-    ENDIF(_XIBS)
-
-    # Fix Qt bundle
-    IF(_QMS)
-      ADD_CUSTOM_COMMAND(TARGET ${name} PRE_BUILD COMMAND mkdir -p ${RESOURCES_DIR}/translations)
-      # Copying all Qt translations to bundle
-      FOREACH(_QM ${_QMS})
-        ADD_CUSTOM_COMMAND(TARGET ${name} POST_BUILD COMMAND cp ARGS ${_QM} ${RESOURCES_DIR}/translations)
-      ENDFOREACH(_QM)
-
-      FOREACH(_LANG ${_LANGS})
-        SET(LANG_FILE "${QT_TRANSLATIONS_DIR}/qt_${_LANG}.qm")
-        IF(EXISTS ${LANG_FILE})
-          ADD_CUSTOM_COMMAND(TARGET ${name} POST_BUILD COMMAND cp ARGS ${LANG_FILE} ${RESOURCES_DIR}/translations)
-        ENDIF(EXISTS ${LANG_FILE})
-      ENDFOREACH(_LANG)
-
-      # Copying qt_menu.nib to bundle
-      IF(MAC_RESOURCES_DIR)
-        ADD_CUSTOM_COMMAND(TARGET ${name} POST_BUILD COMMAND cp -R ARGS ${MAC_RESOURCES_DIR}/qt_menu.nib ${RESOURCES_DIR})
-      ENDIF(MAC_RESOURCES_DIR)
-    ENDIF(_QMS)
-
-    IF(_ICNSS)
-      # Copying all icons to bundle
-      FOREACH(_ICNS ${_ICNSS})
-        # If target Mac OS X, use first icon for Bundle
-        IF(NOT IOS AND NOT MACOSX_BUNDLE_ICON_FILE)
-          GET_FILENAME_COMPONENT(_ICNS_NAME ${_ICNS} NAME)
-          SET(MACOSX_BUNDLE_ICON_FILE ${_ICNS_NAME})
-        ENDIF(NOT IOS AND NOT MACOSX_BUNDLE_ICON_FILE)
-        IF(NOT XCODE)
-          ADD_CUSTOM_COMMAND(TARGET ${name} POST_BUILD COMMAND cp ARGS ${_ICNS} ${RESOURCES_DIR})
-        ENDIF(NOT XCODE)
-      ENDFOREACH(_ICNS)
-    ENDIF(_ICNSS)
-
-    IF(_MISCS AND NOT XCODE)
-      # Copying all misc files to bundle
-      FOREACH(_MISC ${_MISCS})
-        ADD_CUSTOM_COMMAND(TARGET ${name} POST_BUILD COMMAND cp ARGS ${_MISC} ${RESOURCES_DIR})
-      ENDFOREACH(_MISC)
-    ENDIF(_MISCS AND NOT XCODE)
+    INIT_BUNDLE(${name})
+    INSTALL_MAC_RESOURCES(${name})
+    COMPILE_MAC_XIBS(${name})
 
     IF(NOT XCODE)
-      # Fixing Bundle files for iOS
-      IF(IOS)
-        ADD_CUSTOM_COMMAND(TARGET ${name} POST_BUILD
-          COMMAND mv ${OUTPUT_DIR}/Contents/MacOS/* ${OUTPUT_DIR}
-          COMMAND mv ${OUTPUT_DIR}/Contents/Info.plist ${OUTPUT_DIR}
-          COMMAND rm -rf ${OUTPUT_DIR}/Contents)
-
-        # Adding other needed files
-        ADD_CUSTOM_COMMAND(TARGET ${name} POST_BUILD
-          COMMAND cp ARGS ${CMAKE_IOS_SDK_ROOT}/ResourceRules.plist ${CONTENTS_DIR})
-
-        # Creating .ipa package
-        IF(_ITUNESARTWORK)
-          CONFIGURE_FILE(${MAC_RESOURCES_DIR}/application.xcent ${CMAKE_BINARY_DIR}/application.xcent)
-
-          SET(IPA_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PRODUCT_FIXED}_ipa)
-          SET(IPA ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PRODUCT_FIXED}-${VERSION}.ipa)
-
-          ADD_CUSTOM_TARGET(package
-            COMMAND rm -rf "${OUTPUT_DIR}/Contents"
-            COMMAND mkdir -p "${IPA_DIR}/Payload"
-            COMMAND strip "${CONTENTS_DIR}/${PRODUCT_FIXED}"
-            COMMAND security unlock-keychain -p "${KEYCHAIN_PASSWORD}"
-            COMMAND CODESIGN_ALLOCATE=${CMAKE_IOS_DEVELOPER_ROOT}/usr/bin/codesign_allocate codesign -fs "${IOS_DISTRIBUTION}" "--resource-rules=${CONTENTS_DIR}/ResourceRules.plist" --entitlements "${CMAKE_BINARY_DIR}/application.xcent" "${CONTENTS_DIR}"
-            COMMAND cp -R "${OUTPUT_DIR}" "${IPA_DIR}/Payload"
-            COMMAND cp "${_ITUNESARTWORK}" "${IPA_DIR}/iTunesArtwork"
-            COMMAND ditto -c -k "${IPA_DIR}" "${IPA}"
-            COMMAND rm -rf "${IPA_DIR}"
-            COMMENT "Creating IPA archive..."
-            SOURCES ${_ITUNESARTWORK}
-            VERBATIM)
-          ADD_DEPENDENCIES(package ${name})
-          SET_TARGET_LABEL(package "PACKAGE")
-        ENDIF(_ITUNESARTWORK)
-      ENDIF(IOS)
-
-      IF(IOS AND NOT IOS_PLATFORM STREQUAL "OS")
-        SET(IOS_SIMULATOR "${CMAKE_IOS_DEVELOPER_ROOT}/Applications/iPhone Simulator.app/Contents/MacOS/iPhone Simulator")
-        IF(EXISTS ${IOS_SIMULATOR})
-          ADD_CUSTOM_TARGET(run
-            COMMAND rm -rf ${OUTPUT_DIR}/Contents
-            COMMAND ${IOS_SIMULATOR} -SimulateApplication ${OUTPUT_DIR}/${PRODUCT_FIXED}
-            COMMENT "Launching iOS simulator...")
-          ADD_DEPENDENCIES(run ${name})
-          SET_TARGET_LABEL(run "RUN")
-        ENDIF(EXISTS ${IOS_SIMULATOR})
-      ENDIF(IOS AND NOT IOS_PLATFORM STREQUAL "OS")
+      FIX_IOS_BUNDLE(${name})
+      CREATE_IOS_PACKAGE_TARGET(${name})
+      CREATE_IOS_RUN_TARGET(${name})
     ENDIF(NOT XCODE)
   ELSE(APPLE AND GUI)
-    IF(QT_QMS)
-      # Install all applications Qt translations
-      INSTALL(FILES ${QT_QMS} DESTINATION ${SHARE_PREFIX}/translations)
-
-      IF(WIN32)
-        FOREACH(_LANG ${_LANGS})
-          SET(LANG_FILE "${QT_TRANSLATIONS_DIR}/qt_${_LANG}.qm")
-          IF(EXISTS ${LANG_FILE})
-            INSTALL(FILES ${LANG_FILE} DESTINATION ${SHARE_PREFIX}/translations)
-          ENDIF(EXISTS ${LANG_FILE})
-        ENDFOREACH(_LANG)
-      ENDIF(WIN32)
-    ENDIF(QT_QMS)
-
-    IF(_QT)
-      IF(WIN32)
-        SET(_QT_MODULES Core Gui Network Xml Sql Webkit Script ScriptTools Svg)
-
-        IF(_QT5)
-          SET(_QT_MODULES ${_QT_MODULES} Widgets Concurrent)
-        ENDIF(_QT5)
-
-        # Install Qt libraries
-        FOREACH(_MODULE ${_QT_MODULES})
-          IF(_QT5)
-            SET(_MODULE_NAME "Qt5${_MODULE}")
-            SET(_MODULE_FOUND ${${_MODULE_NAME}_FOUND})
-          ELSE(_QT5)
-            SET(_MODULE_NAME "Qt${_MODULE}4")
-            STRING(TOUPPER ${_MODULE} _UP_MODULE_NAME)
-            SET(_MODULE_FOUND ${QT_USE_QT${_UP_MODULE_NAME}})
-          ENDIF(_QT5)
-          IF (_MODULE_FOUND)
-            INSTALL(FILES "${QT_BINARY_DIR}/${_MODULE_NAME}.dll" DESTINATION ${BIN_PREFIX})
-          ENDIF (_MODULE_FOUND)
-        ENDFOREACH(_MODULE ${_QT_MODULES})
-
-        IF(_QT4)
-          IF(QT_USE_QTGUI)
-            INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qgif4.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-            INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qico4.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-            INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qjpeg4.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-          ENDIF(QT_USE_QTGUI)
-          IF(QT_USE_QTSQL)
-            INSTALL(FILES "${QT_PLUGINS_DIR}/sqldrivers/qsqlite4.dll" DESTINATION ${BIN_PREFIX}/sqldrivers)
-          ENDIF(QT_USE_QTSQL)
-          IF(QT_USE_QTSVG)
-            INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qsvg4.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-            INSTALL(FILES "${QT_PLUGINS_DIR}/iconengines/qsvgicon4.dll" DESTINATION ${BIN_PREFIX}/iconengines)
-          ENDIF(QT_USE_QTSVG)
-        ENDIF(_QT4)
-
-        IF(_QT5)
-          IF(Qt5Core_FOUND)
-            INSTALL(FILES "${QT_PLUGINS_DIR}/platforms/qwindows.dll" DESTINATION ${BIN_PREFIX}/platforms)
-            INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qico.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-            INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qgif.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-            INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qjpeg.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-          ENDIF(Qt5Core_FOUND)
-          IF(Qt5Widgets_FOUND)
-            INSTALL(FILES "${QT_PLUGINS_DIR}/accessible/qtaccessiblewidgets.dll" DESTINATION ${BIN_PREFIX}/accessible)
-          ENDIF(Qt5Widgets_FOUND)
-          IF(Qt5Sql_FOUND)
-            INSTALL(FILES "${QT_PLUGINS_DIR}/sqldrivers/qsqlite.dll" DESTINATION ${BIN_PREFIX}/sqldrivers)
-          ENDIF(Qt5Sql_FOUND)
-          IF(Qt5Svg_FOUND)
-            INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qsvg.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-            INSTALL(FILES "${QT_PLUGINS_DIR}/iconengines/qsvgicon.dll" DESTINATION ${BIN_PREFIX}/iconengines)
-          ENDIF(Qt5Svg_FOUND)
-        ENDIF(_QT5)
-
-        # Install zlib DLL if found in Qt directory
-        IF(EXISTS "${QT_BINARY_DIR}/zlib1.dll")
-          INSTALL(FILES "${QT_BINARY_DIR}/zlib1.dll" DESTINATION ${BIN_PREFIX})
-        ENDIF(EXISTS "${QT_BINARY_DIR}/zlib1.dll")
-
-        # Install OpenSSL libraries
-        FOREACH(_ARG ${EXTERNAL_BINARY_PATH})
-          IF(EXISTS "${_ARG}/libeay32.dll")
-            INSTALL(FILES
-              "${_ARG}/libeay32.dll"
-              "${_ARG}/ssleay32.dll"
-              DESTINATION ${BIN_PREFIX})
-          ENDIF(EXISTS "${_ARG}/libeay32.dll")
-        ENDFOREACH(_ARG)
-      ENDIF(WIN32)
-    ENDIF(_QT)
+    INSTALL_QT_LIBRARIES()
 
     INCLUDE(InstallRequiredSystemLibraries)
   ENDIF(APPLE AND GUI)
+
+  INSTALL_QT_TRANSLATIONS(${name})
+  INSTALL_QT_MISC(${name})
 
   IF(MSVC AND GUI)
     GET_TARGET_PROPERTY(_LINK_FLAGS ${name} LINK_FLAGS)
@@ -782,11 +394,6 @@ MACRO(SET_TARGET_EXECUTABLE _GUI name)
       SET(_LINK_FLAGS "")
     ENDIF(NOT _LINK_FLAGS)
     SET_TARGET_PROPERTIES(${name} PROPERTIES LINK_FLAGS "/MANIFESTDEPENDENCY:\"type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' publicKeyToken='6595b64144ccf1df' language='*' processorArchitecture='*'\" ${_LINK_FLAGS}")
-    IF(_QT5)
-      IF(CMAKE_VERSION VERSION_LESS "2.8.11")
-        TARGET_LINK_LIBRARIES(${name} ${Qt5Core_QTMAIN_LIBRARIES})
-      ENDIF(CMAKE_VERSION VERSION_LESS "2.8.11")
-    ENDIF(_QT5)
   ENDIF(MSVC AND GUI)
 
   INSTALL(TARGETS ${name} RUNTIME DESTINATION ${BIN_PREFIX} BUNDLE DESTINATION ${BIN_PREFIX})
@@ -816,22 +423,12 @@ MACRO(SET_TARGET_LIB name)
   SET(_SOURCES_SHARED)
   SET(_HEADERS)
   SET(_RESOURCES)
-  SET(_LANGS)
   SET(_MISCS)
   SET(_RCS)
   SET(_DEFS)
 
-  # Qt
-  SET(_TSS)
-  SET(_QRCS)
-  SET(_UIS)
-
-  SET(QT_SOURCES)
-  SET(QT_MOCS)
-  SET(QT_HEADERS)
-  SET(QT_QRCS)
-  SET(QT_QMS)
-
+  DETECT_QT_VERSION()
+  
   # If user specify STATIC or SHARED, override project default
   FOREACH(ARG ${ARGN})
     IF(ARG STREQUAL STATIC)
@@ -854,21 +451,20 @@ MACRO(SET_TARGET_LIB name)
       LIST(APPEND _SOURCES_SHARED ${ARG})
       LIST(APPEND _SOURCES_STATIC ${ARG})
     ELSEIF(ARG MATCHES "\\.(h|pch|hpp|hh|hxx)$")
-      LIST(APPEND _HEADERS ${ARG})
+      # Private includes such as PCH
+      IF(NOT ARG MATCHES "include/")
+        LIST(APPEND _SOURCES_SHARED ${ARG})
+        LIST(APPEND _SOURCES_STATIC ${ARG})
+      ELSE(NOT ARG MATCHES "include/")
+        LIST(APPEND _HEADERS ${ARG})
+      ENDIF(NOT ARG MATCHES "include/")
     ELSE(ARG STREQUAL STATIC)
       SET(_INCLUDE ON)
-      IF(ARG MATCHES "\\.ts$")
-        STRING(REGEX REPLACE "^.*_([a-z-]*)\\.ts$" "\\1" _LANG ${ARG})
-        LIST(APPEND _LANGS ${_LANG})
-        LIST(APPEND _TSS ${ARG})
-      ELSEIF(ARG MATCHES "\\.qrc$")
-        LIST(APPEND _QRCS ${ARG})
-      ELSEIF(ARG MATCHES "\\.ui$")
-        LIST(APPEND _UIS ${ARG})
-      ELSE(ARG MATCHES "\\.xib$")
-        # Miscellaneous file
-        LIST(APPEND _MISCS ${ARG})
-      ENDIF(ARG MATCHES "\\.ts$")
+      IF(ARG MATCHES ${QT_FILES_FILTER})
+        FILTER_QT_FILES(${ARG})
+      ELSEIF(ARG MATCHES ${MAC_FILES_FILTER})
+        FILTER_MAC_FILES(${ARG})
+      ENDIF(ARG MATCHES ${QT_FILES_FILTER})
       IF(_INCLUDE)
         LIST(APPEND _RESOURCES ${ARG})
       ENDIF(_INCLUDE)
@@ -889,50 +485,6 @@ MACRO(SET_TARGET_LIB name)
       LIST(APPEND _RCS ${WINDOWS_RESOURCES_DIR}/resources.rc)
     ENDIF(NOT _RCS AND HAVE_CONFIG_H)
   ENDIF(WIN32)
-  
-  # Specific Qt macros
-  IF(QT_WRAP_CPP)
-    IF(_TSS)
-      IF(WITH_UPDATE_TRANSLATIONS)
-        SET(_TRANS ${_SOURCES_STATIC} ${_HEADERS} ${_UIS})
-        QT4_CREATE_TRANSLATION(QT_QMS ${_TRANS} ${_TSS})
-      ELSE(WITH_UPDATE_TRANSLATIONS)
-        QT4_ADD_TRANSLATION(QT_QMS ${_TSS})
-      ENDIF(WITH_UPDATE_TRANSLATIONS)
-
-      SOURCE_GROUP("translations" FILES ${_TSS})
-    ENDIF(_TSS)
-
-    IF(_QRCS)
-      # Generate .cpp from .qrc
-      QT4_ADD_RESOURCES(QT_QRCS ${_QRCS})
-    ENDIF(_QRCS)
-
-    IF(_UIS)
-      # Generate .h from .ui
-      QT4_WRAP_UI(QT_HEADERS ${_UIS})
-      SOURCE_GROUP("ui" FILES ${_UIS})
-    ENDIF(_UIS)
-
-    IF(_HEADERS)
-      # Generate .cxx from .h witout notice messages
-      QT4_WRAP_CPP(QT_MOCS ${_HEADERS} OPTIONS -nn)
-    ENDIF(_HEADERS)
-
-    # Qt generated files
-    SET(QT_SOURCES ${QT_MOCS} ${QT_HEADERS} ${QT_QRCS} ${QT_QMS})
-
-    IF(QT_SOURCES)
-      SOURCE_GROUP("generated" FILES ${QT_SOURCES})
-    ENDIF(QT_SOURCES)
-  ENDIF(QT_WRAP_CPP)
-
-  IF(NOT APPLE)
-    IF(QT_QMS)
-      # Install all libraries Qt translations
-      INSTALL(FILES ${QT_QMS} DESTINATION ${SHARE_PREFIX}/translations)
-    ENDIF(QT_QMS)
-  ENDIF(NOT APPLE)
 
   IF(IS_PRIVATE)
     SET(IS_STATIC ON)
@@ -940,10 +492,22 @@ MACRO(SET_TARGET_LIB name)
   ENDIF(IS_PRIVATE)
 
   SET(STATIC_LIB OFF)
+
+  # Specific Qt macros
+  COMPILE_QT_TRANSLATIONS(${_SOURCES_STATIC} ${_HEADERS})
+  COMPILE_QT_RESOURCES()
+  COMPILE_QT_UIS()
+  COMPILE_QT_HEADERS(${name} ${_HEADERS})
+
+  IF(IS_SHARED AND IS_STATIC)
+    COMPILE_QT_HEADERS(${name}_static ${_HEADERS})
+  ENDIF(IS_SHARED AND IS_STATIC)
+
+  SET_QT_SOURCES()
   
   IF(NOT _NO_GROUPS)
-    SOURCE_GROUP("include" FILES ${_HEADERS})
-    SOURCE_GROUP("src" FILES ${_SOURCES_SHARED})
+    CREATE_SOURCE_GROUPS(include "${_HEADERS}")
+    CREATE_SOURCE_GROUPS(src "${_SOURCES_SHARED}")
   ENDIF(NOT _NO_GROUPS)
   
   IF(_RCS)
@@ -1089,16 +653,7 @@ MACRO(SET_TARGET_PLUGIN name)
   SET(_RCS)
   SET(_DEFS)
 
-  # Qt
-  SET(_TSS)
-  SET(_QRCS)
-  SET(_UIS)
-
-  SET(QT_SOURCES)
-  SET(QT_MOCS)
-  SET(QT_HEADERS)
-  SET(QT_QRCS)
-  SET(QT_QMS)
+  DETECT_QT_VERSION()
 
   FOREACH(ARG ${ARGN})
     IF(ARG MATCHES "\\.rc$")
@@ -1117,18 +672,12 @@ MACRO(SET_TARGET_PLUGIN name)
       LIST(APPEND _HEADERS ${ARG})
     ELSE(ARG MATCHES "\\.rc$")
       SET(_INCLUDE ON)
-      IF(ARG MATCHES "\\.ts$")
-        STRING(REGEX REPLACE "^.*_([a-z-]*)\\.ts$" "\\1" _LANG ${ARG})
-        LIST(APPEND _LANGS ${_LANG})
-        LIST(APPEND _TSS ${ARG})
-      ELSEIF(ARG MATCHES "\\.qrc$")
-        LIST(APPEND _QRCS ${ARG})
-      ELSEIF(ARG MATCHES "\\.ui$")
-        LIST(APPEND _UIS ${ARG})
-      ELSE(ARG MATCHES "\\.xib$")
+      IF(ARG MATCHES ${QT_FILES_FILTER})
+        FILTER_QT_FILES(${ARG})
+      ELSE(ARG MATCHES ${QT_FILES_FILTER})
         # Miscellaneous file
         LIST(APPEND _MISCS ${ARG})
-      ENDIF(ARG MATCHES "\\.ts$")
+      ENDIF(ARG MATCHES ${QT_FILES_FILTER})
       IF(_INCLUDE)
         LIST(APPEND _RESOURCES ${ARG})
       ENDIF(_INCLUDE)
@@ -1151,48 +700,12 @@ MACRO(SET_TARGET_PLUGIN name)
   ENDIF(WIN32)
 
   # Specific Qt macros
-  IF(QT_WRAP_CPP)
-    IF(_TSS)
-      IF(WITH_UPDATE_TRANSLATIONS)
-        SET(_TRANS ${_SOURCES} ${_HEADERS} ${_UIS})
-        QT4_CREATE_TRANSLATION(QT_QMS ${_TRANS} ${_TSS})
-      ELSE(WITH_UPDATE_TRANSLATIONS)
-        QT4_ADD_TRANSLATION(QT_QMS ${_TSS})
-      ENDIF(WITH_UPDATE_TRANSLATIONS)
+  COMPILE_QT_TRANSLATIONS(${_SOURCES} ${_HEADERS})
+  COMPILE_QT_RESOURCES()
+  COMPILE_QT_UIS()
+  COMPILE_QT_HEADERS(${_HEADERS})
 
-      SOURCE_GROUP("translations" FILES ${_TSS})
-    ENDIF(_TSS)
-
-    IF(_QRCS)
-      # Generate .cpp from .qrc
-      QT4_ADD_RESOURCES(QT_QRCS ${_QRCS})
-    ENDIF(_QRCS)
-
-    IF(_UIS)
-      # Generate .h from .ui
-      QT4_WRAP_UI(QT_HEADERS ${_UIS})
-      SOURCE_GROUP("ui" FILES ${_UIS})
-    ENDIF(_UIS)
-
-    IF(_HEADERS AND _UIS)
-      # Generate .cxx from .h witout notice messages
-      QT4_WRAP_CPP(QT_MOCS ${_HEADERS} OPTIONS -nn)
-    ENDIF(_HEADERS AND _UIS)
-
-    # Qt generated files
-    SET(QT_SOURCES ${QT_MOCS} ${QT_HEADERS} ${QT_QRCS} ${QT_QMS})
-
-    IF(QT_SOURCES)
-      SOURCE_GROUP("generated" FILES ${QT_SOURCES})
-    ENDIF(QT_SOURCES)
-  ENDIF(QT_WRAP_CPP)
-
-  IF(NOT APPLE)
-    IF(QT_QMS)
-      # Install all libraries Qt translations
-      INSTALL(FILES ${QT_QMS} DESTINATION ${SHARE_PREFIX}/translations)
-    ENDIF(QT_QMS)
-  ENDIF(NOT APPLE)
+  SET_QT_SOURCES()
 
   SOURCE_GROUP("src" FILES ${_SOURCES} ${_HEADERS})
 
@@ -1200,7 +713,7 @@ MACRO(SET_TARGET_PLUGIN name)
     SOURCE_GROUP("res" FILES ${_RCS})
   ENDIF(_RCS)
 
-  SET_SOURCES_FLAGS("${_SOURCES}")
+  SET_SOURCES_FLAGS(${_SOURCES})
 
   SET(_OUTPUT_NAME_DEBUG ${name})
   SET(_OUTPUT_NAME_RELEASE ${name})
@@ -1219,6 +732,8 @@ MACRO(SET_TARGET_PLUGIN name)
     ADD_LIBRARY(${name} MODULE ${_SOURCES} ${_HEADERS} ${QT_SOURCES} ${_RESOURCES})
     SIGN_FILE(${name})
   ENDIF(WITH_STATIC_PLUGINS)
+
+  INSTALL_QT_TRANSLATIONS(${name})
 
   SET_TARGET_PROPERTIES(${name} PROPERTIES
     OUTPUT_NAME_DEBUG ${_OUTPUT_NAME_DEBUG}
@@ -1336,28 +851,7 @@ MACRO(SET_TARGET_FLAGS name)
     TARGET_LINK_LIBRARIES(${name} ${STLPORT_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT})
   ENDIF(WITH_STLPORT)
 
-  IF(XCODE)
-    IF(IOS AND IOS_VERSION)
-      SET_TARGET_PROPERTIES(${name} PROPERTIES
-        XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${IOS_VERSION}
-        XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
-        XCODE_ATTRIBUTE_VALID_ARCHS "armv7") # armv6 armv7 armv7s
-    ENDIF(IOS AND IOS_VERSION)
-
-    IF(WITH_VISIBILITY_HIDDEN)
-      SET_TARGET_PROPERTIES(${name} PROPERTIES
-        XCODE_ATTRIBUTE_GCC_SYMBOLS_PRIVATE_EXTERN YES
-        XCODE_ATTRIBUTE_GCC_INLINES_ARE_PRIVATE_EXTERN YES)
-    ENDIF(WITH_VISIBILITY_HIDDEN)
-
-    IF(NOT WITH_EXCEPTIONS)
-      SET_TARGET_PROPERTIES(${name} PROPERTIES XCODE_ATTRIBUTE_GCC_ENABLE_CPP_EXCEPTIONS NO)
-    ENDIF(NOT WITH_EXCEPTIONS)
-
-    IF(NOT WITH_RTTI)
-      SET_TARGET_PROPERTIES(${name} PROPERTIES XCODE_ATTRIBUTE_GCC_ENABLE_CPP_RTTI NO)
-    ENDIF(NOT WITH_RTTI)
-  ENDIF(XCODE)
+  SET_TARGET_FLAGS_XCODE(${name})
 
   IF(WIN32)
     SET(_DEBUG_POSTFIX "d")
@@ -1381,25 +875,29 @@ MACRO(SET_TARGET_FLAGS name)
 ENDMACRO(SET_TARGET_FLAGS)
 
 # Set special flags to sources depending on specific language based on their extension
-MACRO(SET_SOURCES_FLAGS SOURCES)
+FUNCTION(SET_SOURCES_FLAGS)
   SET(_C)
   SET(_CPP)
   SET(_OBJC)
 
-  FOREACH(_SRC ${SOURCES})
-    IF(_SRC MATCHES "\\.c$")
-      LIST(APPEND _C ${_SRC})
-    ELSEIF(_SRC MATCHES "\\.(cpp|cxx|cc)$")
-      LIST(APPEND _CPP ${_SRC})
-    ELSEIF(_SRC MATCHES "\\.(mm|m)$")
-      LIST(APPEND _OBJC ${_SRC})
-    ENDIF(_SRC MATCHES "\\.c$")
-  ENDFOREACH(_SRC)
+  SET(_SOURCES ${ARGN})
 
-  IF(_OBJC)
-    SET_SOURCE_FILES_PROPERTIES(${_OBJC} PROPERTIES COMPILE_FLAGS "-fobjc-abi-version=2 -fobjc-legacy-dispatch")
-  ENDIF(_OBJC)
-ENDMACRO(SET_SOURCES_FLAGS)
+  IF(_SOURCES)
+    FOREACH(_SRC ${_SOURCES})
+      IF(_SRC MATCHES "\\.c$")
+        LIST(APPEND _C ${_SRC})
+      ELSEIF(_SRC MATCHES "\\.(cpp|cxx|cc)$")
+        LIST(APPEND _CPP ${_SRC})
+      ELSEIF(_SRC MATCHES "\\.(mm|m)$")
+        LIST(APPEND _OBJC ${_SRC})
+      ENDIF(_SRC MATCHES "\\.c$")
+    ENDFOREACH(_SRC)
+
+    IF(_OBJC)
+      SET_SOURCE_FILES_PROPERTIES(${_OBJC} PROPERTIES COMPILE_FLAGS "-fobjc-abi-version=2 -fobjc-legacy-dispatch")
+    ENDIF(_OBJC)
+  ENDIF(_SOURCES)
+ENDFUNCTION(SET_SOURCES_FLAGS)
 
 ###
 # Checks build vs. source location. Prevents In-Source builds.
@@ -1436,18 +934,22 @@ MACRO(ADD_OPTION NAME DESCRIPTION)
 ENDMACRO(ADD_OPTION)
 
 MACRO(UPDATE_VERSION)
-  IF(VERSION_PATCH STREQUAL "REVISION")
-    INCLUDE(GetRevision)
+  IF(NOT VERSION_UPDATED)
+    IF(VERSION_PATCH STREQUAL "REVISION")
+      INCLUDE(GetRevision)
 
-    IF(DEFINED REVISION)
-      SET(VERSION_PATCH "${REVISION}")
-    ELSE(DEFINED REVISION)
-      SET(VERSION_PATCH 0)
-    ENDIF(DEFINED REVISION)
-  ENDIF(VERSION_PATCH STREQUAL "REVISION")
+      IF(DEFINED REVISION)
+        SET(VERSION_PATCH "${REVISION}")
+      ELSE(DEFINED REVISION)
+        SET(VERSION_PATCH 0)
+      ENDIF(DEFINED REVISION)
+    ENDIF(VERSION_PATCH STREQUAL "REVISION")
 
-  SET(VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
-  SET(VERSION_RC "${VERSION_MAJOR},${VERSION_MINOR},${VERSION_PATCH},0")
+    SET(VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
+    SET(VERSION_RC "${VERSION_MAJOR},${VERSION_MINOR},${VERSION_PATCH},0")
+    
+    SET(VERSION_UPDATED ON)
+  ENDIF(NOT VERSION_UPDATED)
 ENDMACRO(UPDATE_VERSION)
 
 MACRO(INIT_PROJECT)
@@ -1603,6 +1105,11 @@ MACRO(INIT_BUILD_FLAGS)
     SET(NMAKE ON)
     MESSAGE(STATUS "Generating NMake project")
   ENDIF(CMAKE_GENERATOR MATCHES "NMake")
+
+  IF(CMAKE_GENERATOR MATCHES "Ninja")
+    SET(NINJA ON)
+    MESSAGE(STATUS "Generating Ninja project")
+  ENDIF(CMAKE_GENERATOR MATCHES "Ninja")
 
   # If target and host CPU are the same
   IF("${HOST_CPU}" STREQUAL "${TARGET_CPU}" AND NOT CMAKE_CROSSCOMPILING)
@@ -2346,18 +1853,20 @@ MACRO(SETUP_EXTERNAL)
   ENDIF(MSVC)
 ENDMACRO(SETUP_EXTERNAL)
 
-MACRO(FIND_PACKAGE_HELPER NAME INCLUDE RELEASE DEBUG)
+MACRO(FIND_PACKAGE_HELPER NAME INCLUDE)
   # Looks for a directory containing NAME.
   #
   # NAME is the name of the library, lowercase and uppercase can be mixed
   # It should be EXACTLY (same case) the same part as XXXX in FindXXXX.cmake
   #
   # INCLUDE is the file to check for includes
+  #
+  # Following parameters are optional variables and must be prefixed by:
+  #
   # RELEASE is the list of libraries to check in release mode
   # DEBUG is the list of libraries to check in debug mode
-  # SUFFIXES (optional) is the PATH_SUFFIXES to check for include file
+  # SUFFIXES is the PATH_SUFFIXES to check for include file
   #
-  # For DEBUG and RELEASE, several names can be separated by semi-columns or spaces.
   # The first match will be used in the specified order and next matches will be ignored
   #
   # The following values are defined
@@ -2365,75 +1874,104 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE RELEASE DEBUG)
   # NAME_LIBRARIES   - link against these to use NAME
   # NAME_FOUND       - True if NAME is available.
 
+  SET(_PARAMS ${ARGN})
+
+  SET(_RELEASE_LIBRARIES)
+  SET(_DEBUG_LIBRARIES)
+  SET(_SUFFIXES)
+  
+  SET(_IS_RELEASE OFF)
+  SET(_IS_DEBUG OFF)
+  SET(_IS_SUFFIXES OFF)
+  
+  IF(_PARAMS)
+    FOREACH(_PARAM ${_PARAMS})
+      IF(_PARAM STREQUAL RELEASE)
+        SET(_IS_RELEASE ON)
+        SET(_IS_DEBUG OFF)
+        SET(_IS_SUFFIXES OFF)
+      ELSEIF(_PARAM STREQUAL DEBUG)
+        SET(_IS_RELEASE OFF)
+        SET(_IS_DEBUG ON)
+        SET(_IS_SUFFIXES OFF)
+      ELSEIF(_PARAM STREQUAL SUFFIXES)
+        SET(_IS_RELEASE OFF)
+        SET(_IS_DEBUG OFF)
+        SET(_IS_SUFFIXES ON)
+      ELSEIF(_PARAM STREQUAL QUIET)
+        SET(_IS_RELEASE OFF)
+        SET(_IS_DEBUG OFF)
+        SET(_IS_SUFFIXES OFF)
+        SET(${NAME}_FIND_QUIETLY ON)
+      ELSEIF(_PARAM STREQUAL REQUIRED)
+        SET(_IS_RELEASE OFF)
+        SET(_IS_DEBUG OFF)
+        SET(_IS_SUFFIXES OFF)
+        SET(${NAME}_FIND_REQUIRED ON)
+      ELSE(_PARAM STREQUAL RELEASE)
+        IF(_IS_RELEASE)
+          LIST(APPEND _RELEASE_LIBRARIES ${_PARAM})
+        ELSEIF(_IS_DEBUG)
+          LIST(APPEND _DEBUG_LIBRARIES ${_PARAM})
+        ELSEIF(_IS_SUFFIXES)
+          LIST(APPEND _SUFFIXES ${_PARAM})
+        ELSE(_IS_RELEASE)
+          MESSAGE(STATUS "parameter ${_PARAM} with no prefix")
+        ENDIF(_IS_RELEASE)
+      ENDIF(_PARAM STREQUAL RELEASE)
+    ENDFOREACH(_PARAM)
+  ENDIF(_PARAMS)
+
   # Fixes names if invalid characters are found  
   IF("${NAME}" MATCHES "^[a-zA-Z0-9]+$")
-    SET(NAME_FIXED ${NAME})
+    SET(_NAME_FIXED ${NAME})
   ELSE("${NAME}" MATCHES "^[a-zA-Z0-9]+$")
     # if invalid characters are detected, replace them by valid ones
-    STRING(REPLACE "+" "p" NAME_FIXED ${NAME})
+    STRING(REPLACE "+" "p" _NAME_FIXED ${NAME})
   ENDIF("${NAME}" MATCHES "^[a-zA-Z0-9]+$")
 
   # Create uppercase and lowercase versions of NAME
-  STRING(TOUPPER ${NAME} UPNAME)
-  STRING(TOLOWER ${NAME} LOWNAME)
+  STRING(TOUPPER ${NAME} _UPNAME)
+  STRING(TOLOWER ${NAME} _LOWNAME)
 
-  STRING(TOUPPER ${NAME_FIXED} UPNAME_FIXED)
-  STRING(TOLOWER ${NAME_FIXED} LOWNAME_FIXED)
+  STRING(TOUPPER ${_NAME_FIXED} _UPNAME_FIXED)
+  STRING(TOLOWER ${_NAME_FIXED} _LOWNAME_FIXED)
 
-  SET(SUFFIXES)
-
-  FOREACH(_ARG ${ARGN})
-    IF(_ARG STREQUAL "QUIET")
-      SET(${NAME}_FIND_QUIETLY ON)
-    ELSEIF(_ARG STREQUAL "REQUIRED")
-      SET(${NAME}_FIND_REQUIRED ON)
-    ELSE(_ARG STREQUAL "QUIET")
-      SET(SUFFIXES ${_ARG})
-    ENDIF(_ARG STREQUAL "QUIET")
-  ENDFOREACH(_ARG)
-
-  SET(SUFFIXES ${SUFFIXES} ${LOWNAME} ${LOWNAME_FIXED} ${NAME})
-
-  # Replace spaces by semi-columns to fix a bug
-  STRING(REPLACE " " ";" RELEASE_FIXED ${RELEASE})
-  STRING(REPLACE " " ";" DEBUG_FIXED ${DEBUG})
+  SET(_SUFFIXES ${_SUFFIXES} ${_LOWNAME} ${_LOWNAME_FIXED} ${_NAME})
 
   IF(NOT WIN32 AND NOT IOS)
     FIND_PACKAGE(PkgConfig QUIET)
-    SET(MODULES ${LOWNAME} ${RELEASE_FIXED})
-    LIST(REMOVE_DUPLICATES MODULES)
+    SET(_MODULES ${_LOWNAME} ${_RELEASE_LIBRARIES})
+    LIST(REMOVE_DUPLICATES _MODULES)
     IF(PKG_CONFIG_EXECUTABLE)
-      PKG_SEARCH_MODULE(PKG_${NAME_FIXED} QUIET ${MODULES})
+      PKG_SEARCH_MODULE(PKG_${_NAME_FIXED} QUIET ${_MODULES})
     ENDIF(PKG_CONFIG_EXECUTABLE)
   ENDIF(NOT WIN32 AND NOT IOS)
 
-  SET(INCLUDE_PATHS)
-  SET(LIBRARY_PATHS)
+  SET(_INCLUDE_PATHS)
+  SET(_LIBRARY_PATHS)
 
-  IF(DEFINED ${UPNAME_FIXED}_DIR)
-    LIST(APPEND INCLUDE_PATHS ${${UPNAME_FIXED}_DIR}/include ${${UPNAME_FIXED}_DIR})
-    LIST(APPEND LIBRARY_PATHS ${${UPNAME_FIXED}_DIR}/lib${LIB_SUFFIX})
-  ENDIF(DEFINED ${UPNAME_FIXED}_DIR)
+  # Check for root directories passed to CMake with -DXXX_DIR=...
+  IF(DEFINED ${_UPNAME_FIXED}_DIR)
+    LIST(APPEND _INCLUDE_PATHS ${${_UPNAME_FIXED}_DIR}/include ${${_UPNAME_FIXED}_DIR})
+    LIST(APPEND _LIBRARY_PATHS ${${_UPNAME_FIXED}_DIR}/lib${LIB_SUFFIX})
+  ENDIF(DEFINED ${_UPNAME_FIXED}_DIR)
 
-  IF(DEFINED ${UPNAME}_DIR)
-    LIST(APPEND INCLUDE_PATHS ${${UPNAME}_DIR}/include ${${UPNAME}_DIR})
-    LIST(APPEND LIBRARY_PATHS ${${UPNAME}_DIR}/lib${LIB_SUFFIX})
-  ENDIF(DEFINED ${UPNAME}_DIR)
-
-  SET(LIBRARY_PATHS ${LIBRARY_PATHS}
-    $ENV{${UPNAME}_DIR}/lib${LIB_SUFFIX}
-    $ENV{${UPNAME_FIXED}_DIR}/lib${LIB_SUFFIX})
+  IF(DEFINED ${_UPNAME}_DIR)
+    LIST(APPEND _INCLUDE_PATHS ${${_UPNAME}_DIR}/include ${${_UPNAME}_DIR})
+    LIST(APPEND _LIBRARY_PATHS ${${_UPNAME}_DIR}/lib${LIB_SUFFIX})
+  ENDIF(DEFINED ${_UPNAME}_DIR)
 
   # Search for include directory
-  FIND_PATH(${UPNAME_FIXED}_INCLUDE_DIR 
+  FIND_PATH(${_UPNAME_FIXED}_INCLUDE_DIR 
     ${INCLUDE}
-    HINTS ${PKG_${NAME_FIXED}_INCLUDE_DIRS}
+    HINTS ${PKG_${_NAME_FIXED}_INCLUDE_DIRS}
     PATHS
-    ${INCLUDE_PATHS}
-    $ENV{${UPNAME}_DIR}/include
-    $ENV{${UPNAME_FIXED}_DIR}/include
-    $ENV{${UPNAME}_DIR}
-    $ENV{${UPNAME_FIXED}_DIR}
+    ${_INCLUDE_PATHS}
+    $ENV{${_UPNAME}_DIR}/include
+    $ENV{${_UPNAME_FIXED}_DIR}/include
+    $ENV{${_UPNAME}_DIR}
+    $ENV{${_UPNAME_FIXED}_DIR}
     /usr/local/include
     /usr/include
     /sw/include
@@ -2441,17 +1979,27 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE RELEASE DEBUG)
     /opt/csw/include
     /opt/include
     PATH_SUFFIXES
-    ${SUFFIXES}
+    ${_SUFFIXES}
   )
 
+  # Append environment variables XXX_DIR
+  LIST(APPEND _LIBRARY_PATHS
+    $ENV{${_UPNAME}_DIR}/lib${LIB_SUFFIX}
+    $ENV{${_UPNAME_FIXED}_DIR}/lib${LIB_SUFFIX})
+
+  # Append multiarch libraries paths
   IF(CMAKE_LIBRARY_ARCHITECTURE)
-    SET(LIBRARY_PATHS "/lib/${CMAKE_LIBRARY_ARCHITECTURE};/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}")
+    LIST(APPEND _LIBRARY_PATHS
+      /lib/${CMAKE_LIBRARY_ARCHITECTURE}
+      /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE})
   ENDIF(CMAKE_LIBRARY_ARCHITECTURE)
 
   IF(UNIX)
-    SET(LIBRARY_PATHS ${LIBRARY_PATHS}
+    # Append UNIX standard libraries paths
+    LIST(APPEND _LIBRARY_PATHS
       /usr/local/lib
       /usr/lib
+      /lib
       /usr/local/X11R6/lib
       /usr/X11R6/lib
       /sw/lib
@@ -2461,57 +2009,77 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE RELEASE DEBUG)
       /usr/freeware/lib${LIB_SUFFIX})
   ENDIF(UNIX)
 
+  IF(WITH_STLPORT)
+    LIST(APPEND _RELEASE_LIBRARIES ${_LOWNAME}_stlport ${_LOWNAME_FIXED}_stlport ${NAME}_stlport ${_NAME_FIXED}_stlport)
+    LIST(APPEND _DEBUG_LIBRARIES ${_LOWNAME}_stlportd ${_LOWNAME_FIXED}_stlportd ${NAME}_stlportd ${_NAME_FIXED}_stlportd)
+  ENDIF(WITH_STLPORT)
+
+  LIST(APPEND _RELEASE_LIBRARIES ${_LOWNAME} ${_LOWNAME_FIXED} ${NAME} ${_NAME_FIXED})
+  LIST(APPEND _DEBUG_LIBRARIES ${_LOWNAME}d ${_LOWNAME_FIXED}d ${NAME}d ${_NAME_FIXED}d)
+
   # Search for release library
-  FIND_LIBRARY(${UPNAME_FIXED}_LIBRARY_RELEASE
+  FIND_LIBRARY(${_UPNAME_FIXED}_LIBRARY_RELEASE
     NAMES
-    ${RELEASE_FIXED}
-    HINTS ${PKG_${NAME_FIXED}_LIBRARY_DIRS}
+    ${_RELEASE_LIBRARIES}
+    HINTS ${PKG_${_NAME_FIXED}_LIBRARY_DIRS}
     PATHS
-    ${LIBRARY_PATHS}
+    ${_LIBRARY_PATHS}
     NO_CMAKE_SYSTEM_PATH
   )
 
   # Search for debug library
-  FIND_LIBRARY(${UPNAME_FIXED}_LIBRARY_DEBUG
+  FIND_LIBRARY(${_UPNAME_FIXED}_LIBRARY_DEBUG
     NAMES
-    ${DEBUG_FIXED}
-    HINTS ${PKG_${NAME_FIXED}_LIBRARY_DIRS}
+    ${_DEBUG_LIBRARIES}
+    HINTS ${PKG_${_NAME_FIXED}_LIBRARY_DIRS}
     PATHS
-    ${LIBRARY_PATHS}
+    ${_LIBRARY_PATHS}
     NO_CMAKE_SYSTEM_PATH
   )
+  
+#  MESSAGE(STATUS "libs = ${${_UPNAME_FIXED}_LIBRARY_RELEASE} ${${_UPNAME_FIXED}_LIBRARY_DEBUG}")
 
-  IF(${UPNAME_FIXED}_INCLUDE_DIR)
-    IF(${UPNAME_FIXED}_LIBRARY_RELEASE)
-      # Set also _INCLUDE_DIRS
-      SET(${UPNAME_FIXED}_INCLUDE_DIRS ${${UPNAME_FIXED}_INCLUDE_DIR})
-      # Library has been found if only one library and include are found
-      SET(${UPNAME_FIXED}_FOUND TRUE)
-      SET(${UPNAME_FIXED}_LIBRARIES ${${UPNAME_FIXED}_LIBRARY_RELEASE})
-      SET(${UPNAME_FIXED}_LIBRARY ${${UPNAME_FIXED}_LIBRARY_RELEASE})
-      IF(${UPNAME_FIXED}_LIBRARY_DEBUG)
-        # If debug version is found, use the right one
-        SET(${UPNAME_FIXED}_LIBRARIES optimized ${${UPNAME_FIXED}_LIBRARIES} debug ${${UPNAME_FIXED}_LIBRARY_DEBUG})
-      ENDIF(${UPNAME_FIXED}_LIBRARY_DEBUG)
-    ENDIF(${UPNAME_FIXED}_LIBRARY_RELEASE)
-  ENDIF(${UPNAME_FIXED}_INCLUDE_DIR)
+  SET(${_UPNAME_FIXED}_FOUND OFF)
 
-  IF(${UPNAME_FIXED}_FOUND)
+  IF(${_UPNAME_FIXED}_INCLUDE_DIR)
+    # Set also _INCLUDE_DIRS
+    SET(${_UPNAME_FIXED}_INCLUDE_DIRS ${${_UPNAME_FIXED}_INCLUDE_DIR})
+
+    # Library has been found if at least only one library and include are found
+    IF(${_UPNAME_FIXED}_LIBRARY_RELEASE AND ${_UPNAME_FIXED}_LIBRARY_DEBUG)
+      # Release and debug libraries found
+      SET(${_UPNAME_FIXED}_FOUND ON)
+      SET(${_UPNAME_FIXED}_LIBRARIES optimized ${${_UPNAME_FIXED}_LIBRARY_RELEASE} debug ${${_UPNAME_FIXED}_LIBRARY_DEBUG})
+      SET(${_UPNAME_FIXED}_LIBRARY ${${_UPNAME_FIXED}_LIBRARY_RELEASE})
+    ELSEIF(${_UPNAME_FIXED}_LIBRARY_RELEASE)
+      # Release library found
+      SET(${_UPNAME_FIXED}_FOUND ON)
+      SET(${_UPNAME_FIXED}_LIBRARIES ${${_UPNAME_FIXED}_LIBRARY_RELEASE})
+      SET(${_UPNAME_FIXED}_LIBRARY ${${_UPNAME_FIXED}_LIBRARY_RELEASE})
+    ELSEIF(${_UPNAME_FIXED}_LIBRARY_DEBUG)
+      # Debug library found
+      SET(${_UPNAME_FIXED}_FOUND ON)
+      SET(${_UPNAME_FIXED}_LIBRARIES ${${_UPNAME_FIXED}_LIBRARY_DEBUG})
+      SET(${_UPNAME_FIXED}_LIBRARY ${${_UPNAME_FIXED}_LIBRARY_DEBUG})
+    ENDIF(${_UPNAME_FIXED}_LIBRARY_RELEASE AND ${_UPNAME_FIXED}_LIBRARY_DEBUG)
+  ENDIF(${_UPNAME_FIXED}_INCLUDE_DIR)
+
+  IF(${_UPNAME_FIXED}_FOUND)
     IF(NOT ${NAME}_FIND_QUIETLY)
-      MESSAGE(STATUS "Found ${NAME}: ${${UPNAME_FIXED}_LIBRARIES}")
+      MESSAGE(STATUS "Found ${NAME}: ${${_UPNAME_FIXED}_LIBRARIES}")
     ENDIF(NOT ${NAME}_FIND_QUIETLY)
-  ELSE(${UPNAME_FIXED}_FOUND)
+  ELSE(${_UPNAME_FIXED}_FOUND)
     IF(${NAME}_FIND_REQUIRED)
       MESSAGE(FATAL_ERROR "Error: Unable to find ${NAME}!")
     ENDIF(${NAME}_FIND_REQUIRED)
     IF(NOT ${NAME}_FIND_QUIETLY)
       MESSAGE(STATUS "Warning: Unable to find ${NAME}!")
     ENDIF(NOT ${NAME}_FIND_QUIETLY)
-  ENDIF(${UPNAME_FIXED}_FOUND)
+  ENDIF(${_UPNAME_FIXED}_FOUND)
 
-  MARK_AS_ADVANCED(${UPNAME_FIXED}_LIBRARY_RELEASE ${UPNAME_FIXED}_LIBRARY_DEBUG)
+  MARK_AS_ADVANCED(${_UPNAME_FIXED}_LIBRARY_RELEASE ${_UPNAME_FIXED}_LIBRARY_DEBUG)
 ENDMACRO(FIND_PACKAGE_HELPER)
 
-MACRO(MESSAGE_VERSION_PACKAGE_HELPER NAME LIBRARIES VERSION)
-  MESSAGE(STATUS "Found ${NAME}: ${LIBRARIES} (found version ${VERSION})")
+MACRO(MESSAGE_VERSION_PACKAGE_HELPER NAME VERSION)
+  MESSAGE(STATUS "Found ${NAME} ${VERSION}: ${ARGN}")
 ENDMACRO(MESSAGE_VERSION_PACKAGE_HELPER)

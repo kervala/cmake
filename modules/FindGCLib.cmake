@@ -1,4 +1,4 @@
-FIND_PACKAGE_HELPER(GCLib GCSystem.h gclib gclibd)
+FIND_PACKAGE_HELPER(GCLib GCSystem.h)
 
 IF(GCLIB_FOUND)
   FIND_PACKAGE(Neolib)

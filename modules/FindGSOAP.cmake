@@ -1,4 +1,4 @@
-FIND_PACKAGE_HELPER(GSOAP stdsoap2.h "gsoap stdsoap2" "gsoapd stdsoap2d")
+FIND_PACKAGE_HELPER(GSOAP stdsoap2.h RELEASE stdsoap2 DEBUG gsoapd stdsoap2d)
 
 FIND_PROGRAM(GSOAP_SOAPCPP2
   NAMES

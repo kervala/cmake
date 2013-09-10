@@ -1,6 +1,6 @@
-FIND_PACKAGE_HELPER(JRTPLIB rtpconfig.h jrtplib jrtplib_d "jrtplib3")
+FIND_PACKAGE_HELPER(JRTPLIB rtpconfig.h RELEASE jrtplib DEBUG jrtplib_d SUFFIXES jrtplib3)
 
-FIND_PACKAGE_HELPER(JThread jthread.h jthread jthread_d "jthread")
+FIND_PACKAGE_HELPER(JThread jthread.h RELEASE jthread DEBUG jthread_d SUFFIXES jthread)
 
 IF(JRTPLIB_FOUND)
   SET(JRTPLIB_INCLUDE_DIRS ${JRTPLIB_INCLUDE_DIR} ${JTHREAD_INCLUDE_DIR})

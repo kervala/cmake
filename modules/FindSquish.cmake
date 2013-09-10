@@ -1,1 +1,1 @@
-FIND_PACKAGE_HELPER(Squish squish.h squish squishd)
+FIND_PACKAGE_HELPER(Squish squish.h)

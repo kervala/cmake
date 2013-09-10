@@ -1,4 +1,4 @@
-FIND_PACKAGE_HELPER(WbClient graphictypes.h wbclient wbclientd)
+FIND_PACKAGE_HELPER(WbClient graphictypes.h)
 
 IF(WBCLIENT_FOUND)
   SET(WBCLIENT_INCLUDE_DIRS ${WBCLIENT_INCLUDE_DIRS} ${WBCLIENT_INCLUDE_DIR}/TableauBlanc ${WBCLIENT_INCLUDE_DIR}/TableauBlanc/Messages ${WBCLIENT_INCLUDE_DIR}/TableauBlanc/Objets ${WBCLIENT_INCLUDE_DIR}/TableauBlanc/Socket)

@@ -1,9 +1,11 @@
 SET(BTOLINKCONTROL_DIR ${BTOLINK_CONTROL_DIR})
 
 IF(USE_MFC)
-  SET(LIBRARIES BtoLinkControlManager_win32 BtoLinkControlManager_win32d)
+  SET(LIBRARY_RELEASE BtoLinkControlManager_win32)
+  SET(LIBRARY_DEBUG BtoLinkControlManager_win32d)
 ELSE(USE_MFC)
-  SET(LIBRARIES BtoLinkControlManager_qt BtoLinkControlManager_qtd)
+  SET(LIBRARY_RELEASE BtoLinkControlManager_qt)
+  SET(LIBRARY_DEBUG BtoLinkControlManager_qtd)
 ENDIF(USE_MFC)
 
-FIND_PACKAGE_HELPER(BtoLinkControl btolinkmanager.h ${LIBRARIES})
+FIND_PACKAGE_HELPER(BtoLinkControl btolinkmanager.h RELEASE ${LIBRARY_RELEASE} DEBUG ${LIBRARY_DEBUG})
