@@ -1,11 +1,11 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6.0)
 
-SET(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules;${CMAKE_MODULE_PATH};$ENV{CMAKE_MODULE_PATH}")
+SET(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules;${CMAKE_MODULE_PATH};${CMAKE_MODULES_DIR};$ENV{CMAKE_MODULE_PATH}")
 
 INCLUDE(common OPTIONAL)
 
 IF(NOT COMMON_MODULE_FOUND)
-  MESSAGE(FATAL_ERROR "Unable to find common.cmake! Please place it in CMakeModules subdirectory, set CMAKE_MODULE_PATH environement variable or set CMAKE_MODULE_PATH parameter to CMake.")
+  MESSAGE(FATAL_ERROR "Unable to find common.cmake! Please place it in CMakeModules subdirectory, set CMAKE_MODULE_PATH environement variable or set CMAKE_MODULES_DIR or CMAKE_MODULE_PATH parameter to CMake.")
 ENDIF(NOT COMMON_MODULE_FOUND)
 
 SET(VERSION_MAJOR 1)
