@@ -10,66 +10,18 @@
 # headers => QT_MOCS_CPPS
 # QT_SOURCES
 # QT_LANGS
-# QT_MODULES
+# QT_SHARED_MODULES
+# QT4_MODULES
+# QT5_MODULES
+# QT_MODULES_WANTED
+# QT_MODULES_USED
 
 # Force Debug configuration if launched from Qt Creator
 IF(NOT CMAKE_BUILD_TYPE AND DESKTOP_FILE MATCHES "qtcreator")
   SET(CMAKE_BUILD_TYPE "Debug" CACHE STRING "" FORCE)
 ENDIF(NOT CMAKE_BUILD_TYPE AND DESKTOP_FILE MATCHES "qtcreator")
 
-# Look for Qt 4 and 5 in some environment variables
-SET(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} $ENV{QT5DIR} $ENV{QT4DIR} $ENV{QTDIR})
-
-MACRO(DETECT_QT_VERSION)
-  SET(QT4 OFF)
-  SET(QT5 OFF)
-
-  IF(DEFINED QT_WRAP_CPP)
-    MESSAGE(STATUS "Found Qt 4.x")
-    SET(QT4 ON)
-  ENDIF(DEFINED QT_WRAP_CPP)
-
-  IF(DEFINED Qt5Core_VERSION_STRING)
-    MESSAGE(STATUS "Found Qt ${Qt5Core_VERSION_STRING}")
-    SET(QT5 ON)
-    SET(QT_BINARY_DIR "${_qt5Core_install_prefix}/bin")
-    SET(QT_PLUGINS_DIR "${_qt5Core_install_prefix}/plugins")
-    SET(QT_TRANSLATIONS_DIR "${_qt5Core_install_prefix}/translations")
-  ENDIF(DEFINED Qt5Core_VERSION_STRING)
-
-  IF(QT4 OR QT5)
-    SET(QT ON)
-  ENDIF(QT4 OR QT5)
-
-  # Qt shared modules
-  SET(QT_MODULES CLucene Core Gui Help Multimedia Network OpenGL Qml Script ScriptTools Sql Svg Test WebKit Xml XmlPatterns)
-
-  IF(QT4)
-    # Old modules with Qt 4
-    SET(QT_MODULES ${QT_MODULES} Declarative)
-  ENDIF(QT4)
-
-  IF(QT5)
-    # New modules with Qt 5
-    SET(QT_MODULES ${QT_MODULES} Concurrent MultimediaQuick MultimediaWidgets PrintSupport Quick QuickParticles QuickTest Sensors SerialPort V8 Widgets)
-  ENDIF(QT5)
-
-  SET(QT_MODULES_USED)
-  
-  FOREACH(_MODULE ${QT_MODULES})
-    IF(QT5)
-      SET(_MODULE_NAME "Qt5${_MODULE}")
-      SET(_MODULE_FOUND ${${_MODULE_NAME}_FOUND})
-    ELSE(QT5)
-      SET(_MODULE_NAME "Qt${_MODULE}4")
-      STRING(TOUPPER ${_MODULE} _UP_MODULE_NAME)
-      SET(_MODULE_FOUND ${QT_USE_QT${_UP_MODULE_NAME}})
-    ENDIF(QT5)
-    IF (_MODULE_FOUND)
-      LIST(APPEND QT_MODULES_USED ${_MODULE})
-    ENDIF (_MODULE_FOUND)
-  ENDFOREACH(_MODULE)
-  
+MACRO(INIT_QT)
   # Init all variables needed by Qt
   SET(QT_SOURCES)
   SET(QT_LANGS)
@@ -84,22 +36,91 @@ MACRO(DETECT_QT_VERSION)
   
   # Regex filter for Qt files
   SET(QT_FILES_FILTER "\\.(ts|qrc|ui)$")
-ENDMACRO(DETECT_QT_VERSION)
+ENDMACRO(INIT_QT)
+
+MACRO(USE_QT_MODULES)
+  OPTION(WITH_QT5 "Use Qt 5 instead of Qt 4" ON)
+
+  SET(QT_MODULES_WANTED ${ARGN})
+  SET(QT_MODULES_USED)
+  SET(QT OFF)
+  SET(QT4 OFF)
+  SET(QT5 OFF)
+
+  # Qt shared modules
+  SET(QT_SHARED_MODULES CLucene Core Gui Help Multimedia Network OpenGL Qml Script ScriptTools Sql Svg Test WebKit Xml XmlPatterns)
+
+  # Qt 4 modules
+  SET(QT4_MODULES ${QT_SHARED_MODULES} Main Declarative)
+
+  # Qt 5 modules
+  SET(QT5_MODULES ${QT_SHARED_MODULES} Concurrent LinguistTools MultimediaQuick MultimediaWidgets PrintSupport Quick QuickParticles QuickTest Sensors SerialPort V8 Widgets)
+  
+  IF(WITH_QT5)
+    # Look for Qt 5 in some environment variables
+    SET(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} $ENV{QT5DIR})
+    FIND_PACKAGE(Qt5Core QUIET)
+
+    IF(Qt5Core_FOUND)
+      LIST(APPEND QT_MODULES_WANTED Core LinguistTools)
+      LIST(REMOVE_DUPLICATES QT_MODULES_WANTED)
+      FOREACH(_MODULE ${QT_MODULES_WANTED})
+        IF(QT5_MODULES MATCHES ${_MODULE})
+          FIND_PACKAGE(Qt5${_MODULE})
+          IF("${Qt5${_MODULE}_FOUND}")
+            LIST(APPEND QT_MODULES_USED ${_MODULE})
+            SET(QT5 ON)
+          ENDIF("${Qt5${_MODULE}_FOUND}")
+        ENDIF(QT5_MODULES MATCHES ${_MODULE})
+      ENDFOREACH(_MODULE)
+    ELSE(Qt5Core_FOUND)
+      SET(WITH_QT5 OFF)
+    ENDIF(Qt5Core_FOUND)
+  ENDIF(WITH_QT5)
+
+  IF(NOT WITH_QT5)
+    LIST(APPEND QT_MODULES_WANTED Main Core)
+    LIST(REMOVE_DUPLICATES QT_MODULES_WANTED)
+    FOREACH(_MODULE ${QT_MODULES_WANTED})
+      IF(QT4_MODULES MATCHES ${_MODULE})
+        LIST(APPEND _COMPONENTS Qt${_MODULE})
+      ENDIF(QT4_MODULES MATCHES ${_MODULE})
+    ENDFOREACH(_MODULE)
+    MESSAGE(STATUS "Components ${_COMPONENTS}")
+    FIND_PACKAGE(Qt4 COMPONENTS ${_COMPONENTS} REQUIRED)
+    INCLUDE_DIRECTORIES(${QT_INCLUDES})
+    INCLUDE(${QT_USE_FILE})
+    FOREACH(_MODULE ${QT_MODULES_WANTED})
+      STRING(TOUPPER ${_MODULE} _UP_MODULE_NAME)
+      IF("${QT_USE_QT${_UP_MODULE_NAME}}")
+        LIST(APPEND QT_MODULES_USED ${_MODULE})
+        SET(QT4 ON)
+        SET(QT ON)
+      ENDIF("${QT_USE_QT${_UP_MODULE_NAME}}")
+    ENDFOREACH(_MODULE)
+  ENDIF(NOT WITH_QT5)
+
+  IF(QT5)
+    SET(QT ON)
+    MESSAGE(STATUS "Found Qt ${Qt5Core_VERSION_STRING}")
+
+    # These variables are not defined with Qt5 CMake modules
+    SET(QT_BINARY_DIR "${_qt5Core_install_prefix}/bin")
+    SET(QT_PLUGINS_DIR "${_qt5Core_install_prefix}/plugins")
+    SET(QT_TRANSLATIONS_DIR "${_qt5Core_install_prefix}/translations")
+  ENDIF(QT5)
+ENDMACRO(USE_QT_MODULES)
 
 MACRO(FILTER_QT_FILES FILE)
   IF(QT)
-#    MESSAGE(STATUS "file = ${FILE}")
     IF(${FILE} MATCHES "\\.ts$")
       STRING(REGEX REPLACE "^.*_([a-z-]*)\\.ts$" "\\1" _LANG ${FILE})
       LIST(APPEND QT_LANGS ${_LANG})
       LIST(APPEND QT_TSS ${FILE})
-#      MESSAGE(STATUS "ts = ${QT_TSS} ${FILE}")
     ELSEIF(${FILE} MATCHES "\\.qrc$")
       LIST(APPEND QT_QRCS ${FILE})
-#      MESSAGE(STATUS "qrc = ${QT_QRCS} ${FILE}")
     ELSEIF(${FILE} MATCHES "\\.ui$")
       LIST(APPEND QT_UIS ${FILE})
-#      MESSAGE(STATUS "uis = ${QT_UIS} ${FILE}")
     ENDIF(${FILE} MATCHES "\\.ts$")
   ENDIF(QT)
 ENDMACRO(FILTER_QT_FILES)
@@ -116,7 +137,6 @@ MACRO(COMPILE_QT_RESOURCES)
 ENDMACRO(COMPILE_QT_RESOURCES)
 
 MACRO(COMPILE_QT_UIS)
-#  MESSAGE(STATUS "ok ${QT_UIS}")
   IF(QT_UIS)
     # Generate .h from .ui
     IF(QT5)
@@ -227,53 +247,53 @@ ENDMACRO(INSTALL_QT_TRANSLATIONS)
 MACRO(INSTALL_QT_LIBRARIES)
   IF(WIN32 AND QT)
     # Install Qt libraries
-    FOREACH(_MODULE ${QT_MODULES})
+    FOREACH(_MODULE ${QT_MODULES_USED})
       IF(QT5)
         SET(_MODULE_NAME "Qt5${_MODULE}")
-        SET(_MODULE_FOUND ${${_MODULE_NAME}_FOUND})
       ELSE(QT5)
         SET(_MODULE_NAME "Qt${_MODULE}4")
-        STRING(TOUPPER ${_MODULE} _UP_MODULE_NAME)
-        SET(_MODULE_FOUND ${QT_USE_QT${_UP_MODULE_NAME}})
       ENDIF(QT5)
-      IF (_MODULE_FOUND)
+      
+      # Library
+      IF(EXISTS ${QT_BINARY_DIR}/${_MODULE_NAME}.dll)
         INSTALL(FILES "${QT_BINARY_DIR}/${_MODULE_NAME}.dll" DESTINATION ${BIN_PREFIX})
-      ENDIF (_MODULE_FOUND)
+      ENDIF(EXISTS ${QT_BINARY_DIR}/${_MODULE_NAME}.dll)
+      
+      # Plugins
+      IF(QT4)
+        IF(_MODULE STREQUAL Gui)
+          INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qgif4.dll" DESTINATION ${BIN_PREFIX}/imageformats)
+          INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qico4.dll" DESTINATION ${BIN_PREFIX}/imageformats)
+          INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qjpeg4.dll" DESTINATION ${BIN_PREFIX}/imageformats)
+        ENDIF(_MODULE STREQUAL Gui)
+        IF(_MODULE STREQUAL Sql)
+          INSTALL(FILES "${QT_PLUGINS_DIR}/sqldrivers/qsqlite4.dll" DESTINATION ${BIN_PREFIX}/sqldrivers)
+        ENDIF(_MODULE STREQUAL Sql)
+        IF(_MODULE STREQUAL Svg)
+          INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qsvg4.dll" DESTINATION ${BIN_PREFIX}/imageformats)
+          INSTALL(FILES "${QT_PLUGINS_DIR}/iconengines/qsvgicon4.dll" DESTINATION ${BIN_PREFIX}/iconengines)
+        ENDIF(_MODULE STREQUAL Svg)
+      ENDIF(QT4)
+
+      IF(QT5)
+        IF(_MODULE STREQUAL Core)
+          INSTALL(FILES "${QT_PLUGINS_DIR}/platforms/qwindows.dll" DESTINATION ${BIN_PREFIX}/platforms)
+          INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qico.dll" DESTINATION ${BIN_PREFIX}/imageformats)
+          INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qgif.dll" DESTINATION ${BIN_PREFIX}/imageformats)
+          INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qjpeg.dll" DESTINATION ${BIN_PREFIX}/imageformats)
+        ENDIF(_MODULE STREQUAL Core)
+        IF(_MODULE STREQUAL Widgets)
+          INSTALL(FILES "${QT_PLUGINS_DIR}/accessible/qtaccessiblewidgets.dll" DESTINATION ${BIN_PREFIX}/accessible)
+        ENDIF(_MODULE STREQUAL Widgets)
+        IF(_MODULE STREQUAL Sql)
+          INSTALL(FILES "${QT_PLUGINS_DIR}/sqldrivers/qsqlite.dll" DESTINATION ${BIN_PREFIX}/sqldrivers)
+        ENDIF(_MODULE STREQUAL Sql)
+        IF(_MODULE STREQUAL Svg)
+          INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qsvg.dll" DESTINATION ${BIN_PREFIX}/imageformats)
+          INSTALL(FILES "${QT_PLUGINS_DIR}/iconengines/qsvgicon.dll" DESTINATION ${BIN_PREFIX}/iconengines)
+        ENDIF(_MODULE STREQUAL Svg)
+      ENDIF(QT5)
     ENDFOREACH(_MODULE)
-
-    IF(QT4)
-      IF(QT_USE_QTGUI)
-        INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qgif4.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-        INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qico4.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-        INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qjpeg4.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-      ENDIF(QT_USE_QTGUI)
-      IF(QT_USE_QTSQL)
-        INSTALL(FILES "${QT_PLUGINS_DIR}/sqldrivers/qsqlite4.dll" DESTINATION ${BIN_PREFIX}/sqldrivers)
-      ENDIF(QT_USE_QTSQL)
-      IF(QT_USE_QTSVG)
-        INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qsvg4.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-        INSTALL(FILES "${QT_PLUGINS_DIR}/iconengines/qsvgicon4.dll" DESTINATION ${BIN_PREFIX}/iconengines)
-      ENDIF(QT_USE_QTSVG)
-    ENDIF(QT4)
-
-    IF(QT5)
-      IF(Qt5Core_FOUND)
-        INSTALL(FILES "${QT_PLUGINS_DIR}/platforms/qwindows.dll" DESTINATION ${BIN_PREFIX}/platforms)
-        INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qico.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-        INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qgif.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-        INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qjpeg.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-      ENDIF(Qt5Core_FOUND)
-      IF(Qt5Widgets_FOUND)
-        INSTALL(FILES "${QT_PLUGINS_DIR}/accessible/qtaccessiblewidgets.dll" DESTINATION ${BIN_PREFIX}/accessible)
-      ENDIF(Qt5Widgets_FOUND)
-      IF(Qt5Sql_FOUND)
-        INSTALL(FILES "${QT_PLUGINS_DIR}/sqldrivers/qsqlite.dll" DESTINATION ${BIN_PREFIX}/sqldrivers)
-      ENDIF(Qt5Sql_FOUND)
-      IF(Qt5Svg_FOUND)
-        INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qsvg.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-        INSTALL(FILES "${QT_PLUGINS_DIR}/iconengines/qsvgicon.dll" DESTINATION ${BIN_PREFIX}/iconengines)
-      ENDIF(Qt5Svg_FOUND)
-    ENDIF(QT5)
 
     # Install zlib DLL if found in Qt directory
     IF(EXISTS "${QT_BINARY_DIR}/zlib1.dll")
