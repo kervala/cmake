@@ -7,6 +7,10 @@
 # EXTERNAL_LIBRARY_PATH - where to find external libraries
 # EXTERNAL_FOUND        - True if the external libraries are available
 
+IF(EXTERNAL_FOUND)
+  RETURN()
+ENDIF(EXTERNAL_FOUND)
+
 SET(EXTERNAL_NAME "external")
 
 # List all supported compilers
@@ -62,7 +66,7 @@ IF(NOT EXTERNAL_PATH)
 ENDIF(NOT EXTERNAL_PATH)
 
 IF(EXTERNAL_PATH)
-  SET(EXTERNAL_FOUND TRUE)
+  SET(EXTERNAL_FOUND ON)
 
   FOREACH(ITEM ${EXTERNAL_PATH})
     SET(EXTERNAL_INCLUDE_PATH ${EXTERNAL_INCLUDE_PATH} "${ITEM}/include" ${ITEM})
@@ -77,6 +81,17 @@ IF(EXTERNAL_PATH)
 ENDIF(EXTERNAL_PATH)
 
 IF(EXTERNAL_FOUND)
+  # Special variables for boost
+  IF(WIN32)
+    SET(Boost_USE_STATIC_LIBS ON)
+  ENDIF(WIN32)
+
+  # If using custom boost, we need to define the right variables used by official boost CMake module
+  IF(DEFINED BOOST_DIR)
+    SET(BOOST_INCLUDEDIR ${BOOST_DIR}/include)
+    SET(BOOST_LIBRARYDIR ${BOOST_DIR}/lib${LIB_SUFFIX})
+  ENDIF(DEFINED BOOST_DIR)
+
   IF(NOT External_FIND_QUIETLY)
     MESSAGE(STATUS "Found ${EXTERNAL_NAME}: ${EXTERNAL_PATH}")
   ENDIF(NOT External_FIND_QUIETLY)

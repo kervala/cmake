@@ -8,14 +8,11 @@ IF(CustomMFC_FIND_REQUIRED)
   SET(MFC_FIND_REQUIRED TRUE)
 ENDIF(CustomMFC_FIND_REQUIRED)
 
-# Try to find MFC using official module, MFC_FOUND is set
-FIND_PACKAGE(MFC)
-
 IF(NOT MFC_DIR)
   # If MFC have been found, remember their directory
-  IF(MFC_FOUND AND VC_DIR)
+  IF(VC_DIR)
     SET(MFC_STANDARD_DIR "${VC_DIR}/atlmfc")
-  ENDIF(MFC_FOUND AND VC_DIR)
+  ENDIF(VC_DIR)
 
   FIND_PATH(MFC_DIR
     include/afxwin.h
