@@ -22,12 +22,12 @@ BEGIN
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "FileDescription", DESCRIPTION "\0"
-            VALUE "FileVersion", VERSION "\0"
-            VALUE "LegalCopyright", "Copyright (C) " YEAR " " AUTHOR "\0"
-            VALUE "OriginalFilename", TARGET ".exe\0"
-            VALUE "ProductName", PRODUCT "\0"
-            VALUE "ProductVersion", VERSION "\0"
+            VALUE "FileDescription", DESCRIPTION
+            VALUE "FileVersion", VERSION
+            VALUE "LegalCopyright", "Copyright (C) " YEAR " " AUTHOR
+            VALUE "OriginalFilename", TARGET ".exe"
+            VALUE "ProductName", PRODUCT
+            VALUE "ProductVersion", VERSION
         END
     END
     BLOCK "VarFileInfo"
