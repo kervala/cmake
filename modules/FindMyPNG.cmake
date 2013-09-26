@@ -1,7 +1,19 @@
 FIND_PACKAGE(MyZLIB REQUIRED)
 
 IF(ZLIB_FOUND)
-  FIND_PACKAGE_HELPER(PNG png.h RELEASE libpng png15 libpng15 png14 libpng14 png12 libpng12 DEBUG libpngd png15d libpng15d png14d libpng14d png12d libpng12d QUIET)
+  SET(_PNG_LIBS_RELEASE)
+  SET(_PNG_LIBS_DEBUG)
+
+  SET(_PNG_VERSIONS 18 17 16 15 14 13 12)
+
+  FOREACH(_PNG_VERSION ${_PNG_VERSIONS})
+    LIST(APPEND _PNG_LIBS_RELEASE libpng${_PNG_VERSION}_static libpng${_PNG_VERSION} png${_PNG_VERSION})
+    LIST(APPEND _PNG_LIBS_DEBUG libpng${_PNG_VERSION}_staticd libpng${_PNG_VERSION}d png${_PNG_VERSION}d)
+  ENDFOREACH(_PNG_VERSION)
+
+  FIND_PACKAGE_HELPER(PNG png.h
+    RELEASE ${_PNG_LIBS_RELEASE} libpng_static libpng png
+    DEBUG ${_PNG_LIBS_DEBUG} libpng_staticd libpngd pngd QUIET)
 
   IF(PNG_FOUND)
     # png.h includes zlib.h. Sigh.
