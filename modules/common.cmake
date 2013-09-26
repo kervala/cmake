@@ -1607,6 +1607,15 @@ MACRO(INIT_BUILD_FLAGS)
 
     ADD_PLATFORM_FLAGS("-D_REENTRANT -g -pipe")
 
+    # If -fstack-protector or -fstack-protector-all enabled, enable too new warnings and fix possible link problems
+    IF(PLATFORM_CFLAGS MATCHES "-fstack-protector")
+      IF(WITH_WARNINGS)
+        ADD_PLATFORM_FLAGS("-Wstack-protector")
+      ENDIF(WITH_WARNINGS)
+      # Fix undefined reference to `__stack_chk_fail' error
+      SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -lc")
+    ENDIF(PLATFORM_CFLAGS MATCHES "-fstack-protector")
+
     IF(WITH_COVERAGE)
       ADD_PLATFORM_FLAGS("-fprofile-arcs -ftest-coverage")
     ENDIF(WITH_COVERAGE)
