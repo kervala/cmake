@@ -104,6 +104,7 @@ MACRO(USE_QT_MODULES)
 
     # These variables are not defined with Qt5 CMake modules
     SET(QT_BINARY_DIR "${_qt5Core_install_prefix}/bin")
+    SET(QT_LIBRARY_DIR "${_qt5Core_install_prefix}/lib")
     SET(QT_PLUGINS_DIR "${_qt5Core_install_prefix}/plugins")
     SET(QT_TRANSLATIONS_DIR "${_qt5Core_install_prefix}/translations")
 
@@ -204,6 +205,17 @@ MACRO(SET_QT_SOURCES)
   ENDIF(QT)
 ENDMACRO(SET_QT_SOURCES)
 
+MACRO(LINK_QT_PLUGIN _TARGET _TYPE _NAME)
+  SET(_LIB "${QT_PLUGINS_DIR}/${_TYPE}/q${_NAME}.lib")
+  IF(EXISTS ${_LIB})
+    TARGET_LINK_LIBRARIES(${_TARGET} optimized ${_LIB})
+  ENDIF(EXISTS ${_LIB})
+  SET(_LIB "${QT_PLUGINS_DIR}/${_TYPE}/q${_NAME}d.lib")
+  IF(EXISTS ${_LIB})
+    TARGET_LINK_LIBRARIES(${_TARGET} debug ${_LIB})
+  ENDIF(EXISTS ${_LIB})
+ENDMACRO(LINK_QT_PLUGIN)
+
 MACRO(LINK_QT_LIBRARIES _TARGET)
   IF(QT)
     IF(QT5)
@@ -215,6 +227,49 @@ MACRO(LINK_QT_LIBRARIES _TARGET)
       IF(_TYPE STREQUAL EXECUTABLE AND CMAKE_VERSION VERSION_LESS "2.8.11")
         TARGET_LINK_LIBRARIES(${_TARGET} ${Qt5Core_QTMAIN_LIBRARIES})
       ENDIF(_TYPE STREQUAL EXECUTABLE AND CMAKE_VERSION VERSION_LESS "2.8.11")
+
+      # Check if we are using Qt static or shared libraries
+      GET_TARGET_PROPERTY(_FILE Qt5::Core IMPORTED_LOCATION_RELEASE)
+
+      IF(WIN32 AND _FILE MATCHES "\\.lib$")
+        ADD_DEFINITIONS(-DQT_STATICPLUGIN)
+      
+        FIND_PACKAGE(MyPNG)
+        FIND_PACKAGE(JPEG)
+        TARGET_LINK_LIBRARIES(${_TARGET}
+          ${PNG_LIBRARIES}
+          ${JPEG_LIBRARIES}
+          ${WINSDK_LIBRARY_DIR}/WS2_32.Lib
+          ${WINSDK_LIBRARY_DIR}/Crypt32.lib
+          ${WINSDK_LIBRARY_DIR}/OpenGL32.lib
+          ${WINSDK_LIBRARY_DIR}/Imm32.lib
+          ${WINSDK_LIBRARY_DIR}/WinMM.Lib
+          optimized ${QT_LIBRARY_DIR}/Qt5PlatformSupport.lib
+          debug ${QT_LIBRARY_DIR}/Qt5PlatformSupportd.lib
+        )
+        
+        FOREACH(_MODULE ${QT_MODULES_USED})
+          IF(_MODULE STREQUAL Core)
+            LINK_QT_PLUGIN(${_TARGET} platforms windows)
+          ENDIF(_MODULE STREQUAL Core)
+          IF(_MODULE STREQUAL Gui)
+            LINK_QT_PLUGIN(${_TARGET} imageformats ico)
+#            LINK_QT_PLUGIN(${_TARGET} imageformats gif)
+            LINK_QT_PLUGIN(${_TARGET} imageformats jpeg)
+            LINK_QT_PLUGIN(${_TARGET} imageformats mng)
+          ENDIF(_MODULE STREQUAL Gui)
+          IF(_MODULE STREQUAL Widgets)
+            LINK_QT_PLUGIN(${_TARGET} accessible taccessiblewidgets)
+          ENDIF(_MODULE STREQUAL Widgets)
+          IF(_MODULE STREQUAL Sql)
+            LINK_QT_PLUGIN(${_TARGET} sqldrivers sqlite)
+          ENDIF(_MODULE STREQUAL Sql)
+          IF(_MODULE STREQUAL Svg)
+            LINK_QT_PLUGIN(${_TARGET} imageformats svg)
+            LINK_QT_PLUGIN(${_TARGET} iconengines svgicon)
+          ENDIF(_MODULE STREQUAL Svg)
+        ENDFOREACH(_MODULE)
+      ENDIF(WIN32 AND _FILE MATCHES "\\.lib$")
     ENDIF(QT5)
     IF(QT4)
       TARGET_LINK_LIBRARIES(${_TARGET} ${QT_LIBRARIES})
@@ -286,10 +341,12 @@ MACRO(INSTALL_QT_LIBRARIES)
       IF(QT5)
         IF(_MODULE STREQUAL Core)
           INSTALL(FILES "${QT_PLUGINS_DIR}/platforms/qwindows.dll" DESTINATION ${BIN_PREFIX}/platforms)
+        ENDIF(_MODULE STREQUAL Core)
+        IF(_MODULE STREQUAL Gui)
           INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qico.dll" DESTINATION ${BIN_PREFIX}/imageformats)
           INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qgif.dll" DESTINATION ${BIN_PREFIX}/imageformats)
           INSTALL(FILES "${QT_PLUGINS_DIR}/imageformats/qjpeg.dll" DESTINATION ${BIN_PREFIX}/imageformats)
-        ENDIF(_MODULE STREQUAL Core)
+        ENDIF(_MODULE STREQUAL Gui)
         IF(_MODULE STREQUAL Widgets)
           INSTALL(FILES "${QT_PLUGINS_DIR}/accessible/qtaccessiblewidgets.dll" DESTINATION ${BIN_PREFIX}/accessible)
         ENDIF(_MODULE STREQUAL Widgets)
