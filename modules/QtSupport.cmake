@@ -206,11 +206,16 @@ MACRO(SET_QT_SOURCES)
 ENDMACRO(SET_QT_SOURCES)
 
 MACRO(LINK_QT_PLUGIN _TARGET _TYPE _NAME)
-  SET(_LIB "${QT_PLUGINS_DIR}/${_TYPE}/q${_NAME}.lib")
+  IF(WIN32)
+    SET(_EXT "lib")
+  ELSE(WIN32)
+    SET(_EXT "a")
+  ENDIF(WIN32)
+  SET(_LIB "${QT_PLUGINS_DIR}/${_TYPE}/q${_NAME}.${_EXT}")
   IF(EXISTS ${_LIB})
     TARGET_LINK_LIBRARIES(${_TARGET} optimized ${_LIB})
   ENDIF(EXISTS ${_LIB})
-  SET(_LIB "${QT_PLUGINS_DIR}/${_TYPE}/q${_NAME}d.lib")
+  SET(_LIB "${QT_PLUGINS_DIR}/${_TYPE}/q${_NAME}d.${_EXT}")
   IF(EXISTS ${_LIB})
     TARGET_LINK_LIBRARIES(${_TARGET} debug ${_LIB})
   ENDIF(EXISTS ${_LIB})
@@ -231,7 +236,7 @@ MACRO(LINK_QT_LIBRARIES _TARGET)
       # Check if we are using Qt static or shared libraries
       GET_TARGET_PROPERTY(_FILE Qt5::Core IMPORTED_LOCATION_RELEASE)
 
-      IF(WIN32 AND _FILE MATCHES "\\.lib$")
+      IF(_FILE MATCHES "\\.(lib|a)$")
         ADD_DEFINITIONS(-DQT_STATICPLUGIN)
       
         FIND_PACKAGE(MyPNG)
@@ -239,18 +244,24 @@ MACRO(LINK_QT_LIBRARIES _TARGET)
         TARGET_LINK_LIBRARIES(${_TARGET}
           ${PNG_LIBRARIES}
           ${JPEG_LIBRARIES}
-          ${WINSDK_LIBRARY_DIR}/WS2_32.Lib
-          ${WINSDK_LIBRARY_DIR}/Crypt32.lib
-          ${WINSDK_LIBRARY_DIR}/OpenGL32.lib
-          ${WINSDK_LIBRARY_DIR}/Imm32.lib
-          ${WINSDK_LIBRARY_DIR}/WinMM.Lib
-          optimized ${QT_LIBRARY_DIR}/Qt5PlatformSupport.lib
-          debug ${QT_LIBRARY_DIR}/Qt5PlatformSupportd.lib
         )
+
+        IF(WIN32)
+          TARGET_LINK_LIBRARIES(${_TARGET}
+            ${WINSDK_LIBRARY_DIR}/WS2_32.Lib
+            ${WINSDK_LIBRARY_DIR}/Crypt32.lib
+            ${WINSDK_LIBRARY_DIR}/OpenGL32.lib
+            ${WINSDK_LIBRARY_DIR}/Imm32.lib
+            ${WINSDK_LIBRARY_DIR}/WinMM.Lib
+            optimized ${QT_LIBRARY_DIR}/Qt5PlatformSupport.lib
+            debug ${QT_LIBRARY_DIR}/Qt5PlatformSupportd.lib)
+        ENDIF(WIN32)
         
         FOREACH(_MODULE ${QT_MODULES_USED})
           IF(_MODULE STREQUAL Core)
-            LINK_QT_PLUGIN(${_TARGET} platforms windows)
+            IF(WIN32)
+              LINK_QT_PLUGIN(${_TARGET} platforms windows)
+            ENDIF(WIN32)
           ENDIF(_MODULE STREQUAL Core)
           IF(_MODULE STREQUAL Gui)
             LINK_QT_PLUGIN(${_TARGET} imageformats ico)
@@ -269,7 +280,7 @@ MACRO(LINK_QT_LIBRARIES _TARGET)
             LINK_QT_PLUGIN(${_TARGET} iconengines svgicon)
           ENDIF(_MODULE STREQUAL Svg)
         ENDFOREACH(_MODULE)
-      ENDIF(WIN32 AND _FILE MATCHES "\\.lib$")
+      ENDIF(_FILE MATCHES "\\.(lib|a)$")
     ENDIF(QT5)
     IF(QT4)
       TARGET_LINK_LIBRARIES(${_TARGET} ${QT_LIBRARIES})
