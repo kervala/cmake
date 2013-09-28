@@ -258,6 +258,9 @@ MACRO(LINK_QT_LIBRARIES _TARGET)
                 debug ${QT_LIBRARY_DIR}/Qt5PlatformSupportd.lib)
               LINK_QT_PLUGIN(${_TARGET} platforms windows)
             ELSEIF(APPLE)
+              TARGET_LINK_LIBRARIES(${_TARGET}
+                optimized ${QT_LIBRARY_DIR}/libQt5PlatformSupport.a
+                debug ${QT_LIBRARY_DIR}/libQt5PlatformSupportd.a)
               LINK_QT_PLUGIN(${_TARGET} platforms cocoa)
             ENDIF(WIN32)
           ENDIF(_MODULE STREQUAL Core)
