@@ -1701,7 +1701,7 @@ MACRO(SETUP_EXTERNAL)
     ENDIF(CMAKE_DL_LIBS)
   ENDIF(WIN32)
 
-  # Android and iOS have pthread  
+  # Android and iOS have pthread
   IF(ANDROID OR IOS)
     SET(CMAKE_USE_PTHREADS_INIT 1)
     SET(Threads_FOUND TRUE)
