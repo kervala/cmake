@@ -277,8 +277,14 @@ MACRO(LINK_QT_LIBRARIES _TARGET)
               LINK_QT_PLUGIN(${_TARGET} platforms qwindows)
             ELSEIF(APPLE)
               FIND_LIBRARY(IOKIT_FRAMEWORK IOKit)
-              TARGET_LINK_LIBRARIES(${_TARGET} ${IOKIT_FRAMEWORK})
-
+              FIND_LIBRARY(ICUUC_LIBRARY icuuc)
+              FIND_LIBRARY(ICUI18N_LIBRARY icui18n)
+              FIND_LIBRARY(PCRE16_LIBRARY pcre16)
+              TARGET_LINK_LIBRARIES(${_TARGET}
+                ${IOKIT_FRAMEWORK}
+                ${ICUUC_LIBRARY}
+                ${ICUI18N_LIBRARY}
+                ${PCRE16_LIBRARY})
               LINK_QT_PLUGIN(${_TARGET} printsupport cocoaprintersupport)
               LINK_QT_PLUGIN(${_TARGET} platforms qcocoa)
             ENDIF(WIN32)
