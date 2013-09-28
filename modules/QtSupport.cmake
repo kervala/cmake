@@ -205,6 +205,24 @@ MACRO(SET_QT_SOURCES)
   ENDIF(QT)
 ENDMACRO(SET_QT_SOURCES)
 
+MACRO(LINK_QT_LIBRARY _TARGET _NAME)
+  IF(WIN32)
+    SET(_PREFIX "Qt5")
+    SET(_EXT "lib")
+  ELSE(WIN32)
+    SET(_PREFIX "libQt5")
+    SET(_EXT "a")
+  ENDIF(WIN32)
+  SET(_LIB "${QT_LIBRARY_DIR}/${_PREFIX}${_NAME}.${_EXT}")
+  IF(EXISTS ${_LIB})
+    TARGET_LINK_LIBRARIES(${_TARGET} optimized ${_LIB})
+  ENDIF(EXISTS ${_LIB})
+  SET(_LIB "${QT_LIBRARY_DIR}/${_PREFIX}${_NAME}d.${_EXT}")
+  IF(EXISTS ${_LIB})
+    TARGET_LINK_LIBRARIES(${_TARGET} debug ${_LIB})
+  ENDIF(EXISTS ${_LIB})
+ENDMACRO(LINK_QT_LIBRARY)
+
 MACRO(LINK_QT_PLUGIN _TARGET _TYPE _NAME)
   IF(WIN32)
     SET(_PREFIX "")
@@ -248,19 +266,16 @@ MACRO(LINK_QT_LIBRARIES _TARGET)
 
         FOREACH(_MODULE ${QT_MODULES_USED})
           IF(_MODULE STREQUAL Core)
+            LINK_QT_LIBRARY(${_TARGET} PrintSupport)
+            LINK_QT_LIBRARY(${_TARGET} PlatformSupport)
             IF(WIN32)
               TARGET_LINK_LIBRARIES(${_TARGET}
                 ${WINSDK_LIBRARY_DIR}/Imm32.lib
                 ${WINSDK_LIBRARY_DIR}/WS2_32.Lib
                 ${WINSDK_LIBRARY_DIR}/OpenGL32.lib
-                ${WINSDK_LIBRARY_DIR}/WinMM.Lib
-                optimized ${QT_LIBRARY_DIR}/Qt5PlatformSupport.lib
-                debug ${QT_LIBRARY_DIR}/Qt5PlatformSupportd.lib)
+                ${WINSDK_LIBRARY_DIR}/WinMM.Lib)
               LINK_QT_PLUGIN(${_TARGET} platforms qwindows)
             ELSEIF(APPLE)
-              TARGET_LINK_LIBRARIES(${_TARGET}
-                optimized ${QT_LIBRARY_DIR}/libQt5PlatformSupport.a
-                debug ${QT_LIBRARY_DIR}/libQt5PlatformSupportd.a)
               LINK_QT_PLUGIN(${_TARGET} printsupport cocoaprintersupport)
               LINK_QT_PLUGIN(${_TARGET} platforms qcocoa)
             ENDIF(WIN32)
