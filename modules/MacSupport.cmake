@@ -376,7 +376,7 @@ MACRO(INIT_BUILD_FLAGS_MAC)
         SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -Wl,-macosx_version_min,${CMAKE_OSX_DEPLOYMENT_TARGET}")
       ENDIF(IOS)
 
-      SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -Wl,-headerpad_max_install_names -lc++")
+      SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -Wl,-headerpad_max_install_names")
 
       IF(HAVE_FLAG_SEARCH_PATHS_FIRST)
         SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -Wl,-search_paths_first")
