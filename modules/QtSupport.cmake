@@ -241,34 +241,38 @@ MACRO(LINK_QT_LIBRARIES _TARGET)
       
         FIND_PACKAGE(MyPNG)
         FIND_PACKAGE(JPEG)
-        TARGET_LINK_LIBRARIES(${_TARGET}
-          ${PNG_LIBRARIES}
-          ${JPEG_LIBRARIES}
-        )
 
-        IF(WIN32)
-          TARGET_LINK_LIBRARIES(${_TARGET}
-            ${WINSDK_LIBRARY_DIR}/WS2_32.Lib
-            ${WINSDK_LIBRARY_DIR}/Crypt32.lib
-            ${WINSDK_LIBRARY_DIR}/OpenGL32.lib
-            ${WINSDK_LIBRARY_DIR}/Imm32.lib
-            ${WINSDK_LIBRARY_DIR}/WinMM.Lib
-            optimized ${QT_LIBRARY_DIR}/Qt5PlatformSupport.lib
-            debug ${QT_LIBRARY_DIR}/Qt5PlatformSupportd.lib)
-        ENDIF(WIN32)
-        
+        TARGET_LINK_LIBRARIES(${_TARGET} ${PNG_LIBRARIES} ${JPEG_LIBRARIES})
+
         FOREACH(_MODULE ${QT_MODULES_USED})
           IF(_MODULE STREQUAL Core)
             IF(WIN32)
+              TARGET_LINK_LIBRARIES(${_TARGET}
+                ${WINSDK_LIBRARY_DIR}/Imm32.lib
+                ${WINSDK_LIBRARY_DIR}/WS2_32.Lib
+                ${WINSDK_LIBRARY_DIR}/OpenGL32.lib
+                ${WINSDK_LIBRARY_DIR}/WinMM.Lib
+                optimized ${QT_LIBRARY_DIR}/Qt5PlatformSupport.lib
+                debug ${QT_LIBRARY_DIR}/Qt5PlatformSupportd.lib)
               LINK_QT_PLUGIN(${_TARGET} platforms windows)
+            ELSEIF(APPLE)
+              LINK_QT_PLUGIN(${_TARGET} platforms cocoa)
             ENDIF(WIN32)
           ENDIF(_MODULE STREQUAL Core)
+          IF(_MODULE STREQUAL Network)
+            IF(WIN32)
+              TARGET_LINK_LIBRARIES(${_TARGET} ${WINSDK_LIBRARY_DIR}/Crypt32.lib)
+            ENDIF(WIN32)
+          ENDIF(_MODULE STREQUAL Network)
           IF(_MODULE STREQUAL Gui)
             LINK_QT_PLUGIN(${_TARGET} imageformats ico)
-#            LINK_QT_PLUGIN(${_TARGET} imageformats gif)
-            LINK_QT_PLUGIN(${_TARGET} imageformats jpeg)
             LINK_QT_PLUGIN(${_TARGET} imageformats mng)
           ENDIF(_MODULE STREQUAL Gui)
+          IF(_MODULE STREQUAL Multimedia)
+            IF(WIN32)
+              TARGET_LINK_LIBRARIES(${_TARGET} ${WINSDK_LIBRARY_DIR}/strmiids.lib)
+            ENDIF(WIN32)
+          ENDIF(_MODULE STREQUAL Multimedia)
           IF(_MODULE STREQUAL Widgets)
             LINK_QT_PLUGIN(${_TARGET} accessible taccessiblewidgets)
           ENDIF(_MODULE STREQUAL Widgets)
