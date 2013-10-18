@@ -5,22 +5,15 @@ SET(VERSION_UPDATED OFF)
 # Force Release configuration for compiler checks
 SET(CMAKE_TRY_COMPILE_CONFIGURATION "Release")
 
-# Check .desktop file under Gnome
-SET(DESKTOP_FILE $ENV{GIO_LAUNCHED_DESKTOP_FILE})
-
-# Check build directory
-IF(NOT DESKTOP_FILE)
-  SET(DESKTOP_FILE ${CMAKE_BINARY_DIR})
-ENDIF(NOT DESKTOP_FILE)
-
 INCLUDE(QtSupport)
 INCLUDE(MacSupport)
 INCLUDE(WinSupport)
 
-# Force Release configuration by default
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
-ENDIF(NOT CMAKE_BUILD_TYPE)
+ENDIF()
+
+MESSAGE(STATUS "Using configuration ${CMAKE_BUILD_TYPE}")
 
 ###
 # Helper macro that generates .pc and installs it.
@@ -229,7 +222,7 @@ MACRO(CREATE_SOURCE_GROUPS DIR FILES)
   FOREACH(_FILE ${FILES})
     # Get only directory from filename
     GET_FILENAME_COMPONENT(_DIR ${_FILE} PATH)
-    
+
     SET(_NAME)
     SET(_GROUP)
 
@@ -1123,11 +1116,6 @@ MACRO(INIT_BUILD_FLAGS)
 
   SET(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
 
-  IF(NOT CMAKE_BUILD_TYPE MATCHES "Debug" AND NOT CMAKE_BUILD_TYPE MATCHES "Release")
-    # enforce release mode if it's neither Debug nor Release
-    SET(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
-  ENDIF(NOT CMAKE_BUILD_TYPE MATCHES "Debug" AND NOT CMAKE_BUILD_TYPE MATCHES "Release")
-
   SET(HOST_CPU ${CMAKE_HOST_SYSTEM_PROCESSOR})
 
   IF(HOST_CPU MATCHES "(amd|AMD)64")
@@ -1934,8 +1922,6 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE)
     ${_LIBRARY_PATHS}
     NO_CMAKE_SYSTEM_PATH
   )
-  
-#  MESSAGE(STATUS "libs = ${${_UPNAME_FIXED}_LIBRARY_RELEASE} ${${_UPNAME_FIXED}_LIBRARY_DEBUG}")
 
   SET(${_UPNAME_FIXED}_FOUND OFF)
 
