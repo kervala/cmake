@@ -86,12 +86,6 @@ IF(EXTERNAL_FOUND)
     SET(Boost_USE_STATIC_LIBS ON)
   ENDIF(WIN32)
 
-  # If using custom boost, we need to define the right variables used by official boost CMake module
-  IF(DEFINED BOOST_DIR)
-    SET(BOOST_INCLUDEDIR ${BOOST_DIR}/include)
-    SET(BOOST_LIBRARYDIR ${BOOST_DIR}/lib${LIB_SUFFIX})
-  ENDIF(DEFINED BOOST_DIR)
-
   IF(NOT External_FIND_QUIETLY)
     MESSAGE(STATUS "Found ${EXTERNAL_NAME}: ${EXTERNAL_PATH}")
   ENDIF(NOT External_FIND_QUIETLY)
