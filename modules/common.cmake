@@ -205,6 +205,16 @@ MACRO(CONVERT_VERSION_NUMBER _VERSION_NUMBER _BASE)
   ENDFOREACH(_ARG)
 ENDMACRO(CONVERT_VERSION_NUMBER)
 
+MACRO(CONVERT_NUMBER_VERSION _VERSION_NUMBER _BASE _OUT)
+  SET(${_OUT})
+  SET(_NUMBER ${_VERSION_NUMBER})
+  WHILE(_NUMBER GREATER 0)
+    MATH(EXPR _TEMP "${_NUMBER} % ${_BASE}")
+    LIST(APPEND ${_OUT} ${_TEMP})
+    MATH(EXPR _NUMBER "${_NUMBER} / ${_BASE}")
+  ENDWHILE()
+ENDMACRO(CONVERT_NUMBER_VERSION)
+
 MACRO(SIGN_FILE target)
   IF(WIN32)
     SIGN_FILE_WINDOWS(${target})
@@ -227,10 +237,17 @@ MACRO(CREATE_SOURCE_GROUPS DIR FILES)
     SET(_GROUP)
 
     IF(_DIR)
+      # Transform "+" to valid characters in a regular expression
+      STRING(REPLACE "+" "\\+" _GENERATED_DIR ${_GENERATED_DIR})
       IF(_DIR MATCHES "${_GENERATED_DIR}")
         SET(_NAME "GENERATED")
         SET(_GROUP "generated")
       ELSE(_DIR MATCHES "${_GENERATED_DIR}")
+        # If directory is not absolute, fix it
+        IF(NOT IS_ABSOLUTE _DIR)
+          GET_FILENAME_COMPONENT(_DIR ${_DIR} ABSOLUTE)
+        ENDIF()
+
         # Get relative path from CMake current directory
         FILE(RELATIVE_PATH _DIR ${_ROOT_DIR} ${_DIR})
 
@@ -252,9 +269,9 @@ MACRO(CREATE_SOURCE_GROUPS DIR FILES)
     ENDIF(NOT _NAME)
 
     IF(_GROUP)
-      IF(NOT _GROUP STREQUAL ${DIR} AND NOT _GROUP MATCHES "^(${DIR}/|generated)")
+      IF(NOT _GROUP STREQUAL ${DIR} AND NOT _GROUP MATCHES "^(${DIR}\\\\|generated)")
         SET(_GROUP "${DIR}\\${_GROUP}")
-      ENDIF(NOT _GROUP STREQUAL ${DIR} AND NOT _GROUP MATCHES "^(${DIR}/|generated)")
+      ENDIF(NOT _GROUP STREQUAL ${DIR} AND NOT _GROUP MATCHES "^(${DIR}\\\\|generated)")
     ELSE(_GROUP)
       SET(_GROUP "${DIR}")
     ENDIF(_GROUP)
@@ -1313,7 +1330,7 @@ MACRO(INIT_BUILD_FLAGS)
       ADD_PLATFORM_FLAGS("/Zm1000")
     ENDIF(WITH_PCH_MAX_SIZE)
 
-    ADD_PLATFORM_FLAGS("/D_WIN32_WINNT=0x0501")
+    ADD_PLATFORM_FLAGS("/D_WIN32_WINNT=0x0501 /DWINVER=0x0501")
 
     IF(TARGET_X64)
       # Fix a bug with Intellisense
@@ -1848,6 +1865,17 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE)
     LIST(APPEND _LIBRARY_PATHS ${${_UPNAME}_DIR}/lib${LIB_SUFFIX})
   ENDIF(DEFINED ${_UPNAME}_DIR)
 
+  IF(UNIX)
+    # Append UNIX standard include paths
+    SET(_UNIX_INCLUDE_PATHS
+      /usr/local/include
+      /usr/include
+      /sw/include
+      /opt/local/include
+      /opt/csw/include
+      /opt/include)
+  ENDIF()
+
   # Search for include directory
   FIND_PATH(${_UPNAME_FIXED}_INCLUDE_DIR 
     ${INCLUDE}
@@ -1858,12 +1886,7 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE)
     $ENV{${_UPNAME_FIXED}_DIR}/include
     $ENV{${_UPNAME}_DIR}
     $ENV{${_UPNAME_FIXED}_DIR}
-    /usr/local/include
-    /usr/include
-    /sw/include
-    /opt/local/include
-    /opt/csw/include
-    /opt/include
+    ${_UNIX_INCLUDE_PATHS}
     PATH_SUFFIXES
     ${_SUFFIXES}
   )
@@ -1873,16 +1896,19 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE)
     $ENV{${_UPNAME}_DIR}/lib${LIB_SUFFIX}
     $ENV{${_UPNAME_FIXED}_DIR}/lib${LIB_SUFFIX})
 
-  # Append multiarch libraries paths
-  IF(CMAKE_LIBRARY_ARCHITECTURE)
-    LIST(APPEND _LIBRARY_PATHS
-      /lib/${CMAKE_LIBRARY_ARCHITECTURE}
-      /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE})
-  ENDIF(CMAKE_LIBRARY_ARCHITECTURE)
-
   IF(UNIX)
+    SET(_UNIX_LIBRARY_PATHS)
+
+    # Append multiarch libraries paths
+    IF(CMAKE_LIBRARY_ARCHITECTURE)
+      LIST(APPEND _UNIX_LIBRARY_PATHS
+        /usr/local/lib/${CMAKE_LIBRARY_ARCHITECTURE}
+        /lib/${CMAKE_LIBRARY_ARCHITECTURE}
+        /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE})
+    ENDIF()
+
     # Append UNIX standard libraries paths
-    LIST(APPEND _LIBRARY_PATHS
+    LIST(APPEND _UNIX_LIBRARY_PATHS
       /usr/local/lib
       /usr/lib
       /lib
@@ -1903,6 +1929,22 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE)
   LIST(APPEND _RELEASE_LIBRARIES ${_LOWNAME} ${_LOWNAME_FIXED} ${NAME} ${_NAME_FIXED})
   LIST(APPEND _DEBUG_LIBRARIES ${_LOWNAME}d ${_LOWNAME_FIXED}d ${NAME}d ${_NAME_FIXED}d)
 
+  # Under Windows, some libs may need the lib prefix
+  IF(WIN32)
+    SET(_LIBS ${_RELEASE_LIBRARIES})
+    FOREACH(_LIB ${_LIBS})
+      LIST(APPEND _RELEASE_LIBRARIES lib${_LIB})
+    ENDFOREACH()
+
+    SET(_LIBS ${_DEBUG_LIBRARIES})
+    FOREACH(_LIB ${_LIBS})
+      LIST(APPEND _DEBUG_LIBRARIES lib${_LIB})
+    ENDFOREACH()
+  ENDIF(WIN32)
+
+  LIST(REMOVE_DUPLICATES _RELEASE_LIBRARIES)
+  LIST(REMOVE_DUPLICATES _DEBUG_LIBRARIES)
+
   # Search for release library
   FIND_LIBRARY(${_UPNAME_FIXED}_LIBRARY_RELEASE
     NAMES
@@ -1910,6 +1952,7 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE)
     HINTS ${PKG_${_NAME_FIXED}_LIBRARY_DIRS}
     PATHS
     ${_LIBRARY_PATHS}
+    ${_UNIX_LIBRARY_PATHS}
     NO_CMAKE_SYSTEM_PATH
   )
 
