@@ -49,7 +49,7 @@
 
 FIND_PROGRAM(Mercurial_HG_EXECUTABLE hg
   DOC "mercurial command line client"
-  HINTS /opt/local/bin)
+  PATHS /opt/local/bin)
 MARK_AS_ADVANCED(Mercurial_HG_EXECUTABLE)
 
 IF(Mercurial_HG_EXECUTABLE)
