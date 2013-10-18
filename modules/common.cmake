@@ -1418,7 +1418,25 @@ MACRO(INIT_BUILD_FLAGS)
       ADD_PLATFORM_FLAGS("--sysroot=${PLATFORM_ROOT}")
       ADD_PLATFORM_FLAGS("-ffunction-sections -funwind-tables")
       ADD_PLATFORM_FLAGS("-DANDROID")
-      ADD_PLATFORM_FLAGS("-Wa,--noexecstack")
+      ADD_PLATFORM_FLAGS("-I${STL_INCLUDE_DIR} -I${STL_INCLUDE_CPU_DIR}")
+
+      IF(CLANG)
+        IF(TARGET_ARM)
+          IF(TARGET_ARMV7)
+            SET(LLVM_TRIPLE "armv7-none-linux-androideabi")
+          ELSE()
+            SET(LLVM_TRIPLE "armv5te-none-linux-androideabi")
+          ENDIF()
+        ENDIF()
+
+       ADD_PLATFORM_FLAGS("-gcc-toolchain ${GCC_TOOLCHAIN_ROOT} -no-canonical-prefixes")
+       SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -gcc-toolchain ${GCC_TOOLCHAIN_ROOT} -no-canonical-prefixes")
+
+        ADD_PLATFORM_FLAGS("-target ${LLVM_TRIPLE}") # -emit-llvm -fPIC -no-canonical-prefixes
+        SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -target ${LLVM_TRIPLE}")
+      ELSE()
+        ADD_PLATFORM_FLAGS("-Wa,--noexecstack")
+      ENDIF()
 
       IF(TARGET_ARM)
         ADD_PLATFORM_FLAGS("-fpic -fstack-protector")
@@ -1433,10 +1451,21 @@ MACRO(INIT_BUILD_FLAGS)
 
         SET(TARGET_THUMB ON)
         IF(TARGET_THUMB)
-          ADD_PLATFORM_FLAGS("-mthumb -fno-strict-aliasing -finline-limit=64")
+          ADD_PLATFORM_FLAGS("-fno-strict-aliasing")
+
+          IF(NOT CLANG)
+            ADD_PLATFORM_FLAGS("-finline-limit=64")
+          ENDIF()
+          
           SET(DEBUG_CFLAGS "${DEBUG_CFLAGS} -marm")
+          SET(RELEASE_CFLAGS "${RELEASE_CFLAGS} -mthumb")
         ELSE(TARGET_THUMB)
-          ADD_PLATFORM_FLAGS("-funswitch-loops -finline-limit=300")
+          ADD_PLATFORM_FLAGS("-funswitch-loops")
+
+          IF(NOT CLANG)
+            ADD_PLATFORM_FLAGS("-finline-limit=300")
+          ENDIF()
+
           SET(DEBUG_CFLAGS "${DEBUG_CFLAGS} -fno-strict-aliasing")
           SET(RELEASE_CFLAGS "${RELEASE_CFLAGS} -fstrict-aliasing")
         ENDIF(TARGET_THUMB)
