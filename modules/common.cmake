@@ -652,17 +652,62 @@ MACRO(SET_TARGET_LIB name)
       # copy also PDB files in installation directory for Visual C++
       IF(MSVC)
         IF(IS_STATIC)
-          IF(STATIC_LIB)
-            # get final location for Debug configuration
-            GET_TARGET_PROPERTY(OUTPUT_FULLPATH ${name}_static LOCATION_Debug)
-          ELSE(STATIC_LIB)
-            # get final location for Debug configuration
-            GET_TARGET_PROPERTY(OUTPUT_FULLPATH ${name} LOCATION_Debug)
-          ENDIF(STATIC_LIB)
-          # replace extension by .pdb
-          STRING(REGEX REPLACE "\\.([a-zA-Z0-9_]+)$" ".pdb" OUTPUT_FULLPATH ${OUTPUT_FULLPATH})
-          # copy PDB file together with LIB
-          INSTALL(FILES ${OUTPUT_FULLPATH} DESTINATION ${LIB_PREFIX} CONFIGURATIONS Debug)
+          IF(CMAKE_VERSION VERSION_LESS "2.8.12")
+            IF(STATIC_LIB)
+              # get final location for Debug configuration
+              GET_TARGET_PROPERTY(OUTPUT_FULLPATH ${name}_static LOCATION_Debug)
+            ELSE(STATIC_LIB)
+              # get final location for Debug configuration
+              GET_TARGET_PROPERTY(OUTPUT_FULLPATH ${name} LOCATION_Debug)
+            ENDIF(STATIC_LIB)
+            # replace extension by .pdb
+            STRING(REGEX REPLACE "\\.([a-zA-Z0-9_]+)$" ".pdb" OUTPUT_FULLPATH ${OUTPUT_FULLPATH})
+            # copy PDB file together with LIB
+            INSTALL(FILES ${OUTPUT_FULLPATH} DESTINATION ${LIB_PREFIX} CONFIGURATIONS Debug)
+          ELSE()
+            # Since CMake 2.8.12, PDB files are not generated in output directory for static libraries
+            IF(STATIC_LIB)
+              # get final location for Debug configuration
+              GET_TARGET_PROPERTY(OUTPUT_FULLPATH ${name}_static LOCATION_Debug)
+            ELSE(STATIC_LIB)
+              # get final location for Debug configuration
+              GET_TARGET_PROPERTY(OUTPUT_FULLPATH ${name} LOCATION_Debug)
+            ENDIF(STATIC_LIB)
+
+            # Library filename
+            GET_FILENAME_COMPONENT(OUTPUT_FILENAME ${OUTPUT_FULLPATH} NAME)
+
+            # Destination PDB filename
+            STRING(REGEX REPLACE "\\.([a-zA-Z0-9_]+)$" ".pdb" OUTPUT_FILENAME ${OUTPUT_FILENAME})
+            
+            MESSAGE(STATUS "output = ${OUTPUT_FULLPATH} ${OUTPUT_FILENAME}")
+
+            SET(_PDB_FILES)
+
+            IF(NMAKE)
+              SET(OUTPUT_FULLPATH "${CMAKE_BINARY_DIR}/CMakeFiles/${name}.dir/src/vc${MSVC_TOOLSET}.pdb")
+            ELSE()
+              SET(_MSVC_TOOLSETS)
+
+              # Default toolset for compiler
+              LIST(APPEND _MSVC_TOOLSETS ${MSVC_TOOLSET})
+
+              # Append all detected Windows SDK toolchains
+              FOREACH(_WINSDK ${WINSDK_DETECTED_VERSIONS})
+                LIST(APPEND _MSVC_TOOLSETS "windows${_WINSDK}sdk")
+              ENDFOREACH()
+
+              # For all detected toolsets, append PDB name
+              FOREACH(_TOOLSET ${_MSVC_TOOLSETS})
+                LIST(APPEND _PDB_FILES "${CMAKE_BINARY_DIR}/${name}.dir/Debug/vc${_TOOLSET}.pdb")
+              ENDFOREACH()
+            ENDIF()
+
+            # copy PDB file together with LIB
+            FOREACH(_PDB_FILE ${_PDB_FILES})
+              INSTALL(FILES ${_PDB_FILE} DESTINATION ${LIB_PREFIX} CONFIGURATIONS Debug RENAME ${OUTPUT_FILENAME} OPTIONAL)
+            ENDFOREACH()
+          ENDIF()
         ENDIF(IS_STATIC)
         IF(IS_SHARED)
           # get final location for Debug configuration
@@ -1133,13 +1178,17 @@ MACRO(INIT_BUILD_FLAGS)
 
   SET(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "" FORCE)
 
-  SET(HOST_CPU ${CMAKE_HOST_SYSTEM_PROCESSOR})
+  IF(CMAKE_CXX_LIBRARY_ARCHITECTURE)
+    SET(HOST_CPU ${CMAKE_CXX_LIBRARY_ARCHITECTURE})
+  ELSE()
+    SET(HOST_CPU ${CMAKE_HOST_SYSTEM_PROCESSOR})
+  ENDIF()
 
-  IF(HOST_CPU MATCHES "(amd|AMD)64")
+  IF(HOST_CPU MATCHES "(amd|AMD|x86_)64")
     SET(HOST_CPU "x86_64")
   ELSEIF(HOST_CPU MATCHES "i.86")
     SET(HOST_CPU "x86")
-  ENDIF(HOST_CPU MATCHES "(amd|AMD)64")
+  ENDIF()
   
   # Determine target CPU
 
@@ -1963,6 +2012,7 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE)
     HINTS ${PKG_${_NAME_FIXED}_LIBRARY_DIRS}
     PATHS
     ${_LIBRARY_PATHS}
+    ${_UNIX_LIBRARY_PATHS}
     NO_CMAKE_SYSTEM_PATH
   )
 
