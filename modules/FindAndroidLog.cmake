@@ -1,0 +1,1 @@
+FIND_PACKAGE_HELPER(AndroidLog log.h RELEASE log DEBUG log SUFFIXES android)
