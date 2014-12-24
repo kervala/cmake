@@ -4,6 +4,7 @@ FIND_PROGRAM(YASM_EXECUTABLE
   NAMES
     yasm
     yasm-1.2.0-win64.exe
+    yasm-1.2.0-win32.exe
   PATHS
     ${YASM_ROOT_PATH}
     ${YASM_ROOT_PATHS}

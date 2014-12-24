@@ -134,7 +134,7 @@ SET(CMAKE_IOS_SYSROOT ${CMAKE_IOS_SDK_ROOT} CACHE PATH "Sysroot used for iOS sup
 SET(CMAKE_IOS_SIMULATOR_SYSROOT ${CMAKE_IOS_SIMULATOR_SDK_ROOT} CACHE PATH "Sysroot used for iOS Simulator support")
 
 IF(CMAKE_GENERATOR MATCHES Xcode)
-  SET(ARCHS "$(ARCHS_STANDARD_32_BIT)")
+#  SET(ARCHS "$(ARCHS_STANDARD_32_BIT)")
   IF(${IOS_PLATFORM} STREQUAL "OS")
     SET(CMAKE_SYSTEM_PROCESSOR "armv7")
   ELSEIF(${IOS_PLATFORM} STREQUAL "SIMULATOR")
@@ -151,14 +151,16 @@ ELSE(CMAKE_GENERATOR MATCHES Xcode)
     SET(ARCHS "i386")
     SET(CMAKE_SYSTEM_PROCESSOR "x86")
   ELSEIF(${IOS_PLATFORM} STREQUAL "ALL")
-    SET(ARCHS "armv7;i386")
+    SET(ARCHS "armv7;i386;x86_64")
     SET(CMAKE_SYSTEM_PROCESSOR "armv7")
   ENDIF(${IOS_PLATFORM} STREQUAL "OS")
 ENDIF(CMAKE_GENERATOR MATCHES Xcode)
 
 # set the architecture for iOS - using ARCHS_STANDARD_32_BIT sets armv7,armv7s and appears to be XCode's standard. 
 # The other value that works is ARCHS_UNIVERSAL_IPHONE_OS but that sets armv7 only
-set (CMAKE_OSX_ARCHITECTURES ${ARCHS} CACHE string  "Build architecture for iOS")
+IF(ARCHS)
+  SET(CMAKE_OSX_ARCHITECTURES ${ARCHS} CACHE string  "Build architecture for iOS")
+ENDIF()
 
 # Set the find root to the iOS developer roots and to user defined paths
 set (CMAKE_FIND_ROOT_PATH ${CMAKE_IOS_DEVELOPER_ROOT} ${CMAKE_IOS_SDK_ROOT} ${CMAKE_PREFIX_PATH} ${CMAKE_INSTALL_PREFIX} $ENV{EXTERNAL_IOS_PATH} CACHE string  "iOS find search path root")
@@ -174,10 +176,9 @@ set (CMAKE_SYSTEM_FRAMEWORK_PATH
 )
 
 # only search the iOS sdks, not the remainder of the host filesystem
-set (CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set (CMAKE_FIND_ROOT_PATH_MODE_PROGRAM BOTH)
 set (CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set (CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 
-#SET(CMAKE_SYSTEM_INCLUDE_PATH /include /usr/include)
-#SET(CMAKE_SYSTEM_LIBRARY_PATH /lib /usr/lib)
-#SET(CMAKE_SYSTEM_PROGRAM_PATH /bin /usr/bin)
+# determinate location for bin utils based on CMAKE_FIND_ROOT_PATH
+include(CMakeFindBinUtils)
