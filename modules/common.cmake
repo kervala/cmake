@@ -305,7 +305,17 @@ MACRO(CREATE_SOURCE_GROUPS DIR FILES)
   ENDIF()
 ENDMACRO(CREATE_SOURCE_GROUPS)
 
+MACRO(GET_PDB_INTERMEDIATE_FULLPATH name output)
+  # use a simple path to put intermediary PDB file
+  IF(NMAKE)
+    SET(${output} "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${name}.dir/vc${MSVC_TOOLSET}.pdb")
+  ELSE()
+    SET(${output} "${CMAKE_CURRENT_BINARY_DIR}/${name}.dir/Debug/vc${MSVC_TOOLSET}.pdb")
+  ENDIF()
+ENDMACRO()
+
 MACRO(GET_PDB_FULLPATH name output)
+  # only works for Debug configuration
   IF(CMAKE_VERSION VERSION_LESS "2.8.12" OR CMAKE_VERSION VERSION_GREATER "3.0.9")
     # determine output directory based on target type
     GET_TARGET_PROPERTY(_targetType ${name} TYPE)
@@ -314,29 +324,31 @@ MACRO(GET_PDB_FULLPATH name output)
     ELSEIF(${_targetType} STREQUAL STATIC_LIBRARY)
       SET(_targetOutput ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
     ELSE()
-      SET(_targetOutput ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
+      # set it to a temporary directory because the true PDB file is set using /PDB instead of /Fd
+      GET_PDB_INTERMEDIATE_FULLPATH(${name} output)
+      BREAK()
     ENDIF()
 
+    # determine target prefix
+    GET_TARGET_PROPERTY(_targetPrefix ${name} PREFIX)
+    IF(${_targetPrefix} MATCHES NOTFOUND)
+      SET(_targetPrefix "")
+    ENDIF()
+    
     # determine target postfix
-    STRING(TOUPPER "${CMAKE_BUILD_TYPE}_POSTFIX" _postfix_var_name)
-    GET_TARGET_PROPERTY(_targetPostfix ${name} ${_postfix_var_name})
+    GET_TARGET_PROPERTY(_targetPostfix ${name} DEBUG_POSTFIX)
 
     IF(${_targetPostfix} MATCHES NOTFOUND)
       SET(_targetPostfix "${_DEBUG_POSTFIX}")
     ENDIF()
 
     IF(NMAKE)
-      SET(${output} "${_targetOutput}/${name}${_targetPostfix}.pdb")
+      SET(${output} "${_targetOutput}/${_targetPrefix}${name}${_targetPostfix}.pdb")
     ELSE()
-      SET(${output} "${_targetOutput}/Debug/${name}${_targetPostfix}.pdb")
+      SET(${output} "${_targetOutput}/Debug/${_targetPrefix}${name}${_targetPostfix}.pdb")
     ENDIF()
   ELSE()
-    # use a simple path to put intermediary PDB file
-    IF(NMAKE)
-      SET(${output} "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${name}.dir/vc${MSVC_TOOLSET}.pdb")
-    ELSE()
-      SET(${output} "${CMAKE_CURRENT_BINARY_DIR}/${name}.dir/Debug/vc${MSVC_TOOLSET}.pdb")
-    ENDIF()
+    GET_PDB_INTERMEDIATE_FULLPATH(${name} output)
   ENDIF()
 ENDMACRO()
 
@@ -657,6 +669,14 @@ MACRO(SET_TARGET_LIB name)
   ENDIF()
 
   IF(IS_STATIC OR IS_SHARED)
+    # take into account prefix for PDB set in SET_TARGET_FLAGS
+    IF(MSVC AND WITH_PREFIX_LIB)
+      SET_TARGET_PROPERTIES(${name} PROPERTIES PREFIX "lib" IMPORT_PREFIX "lib")
+      IF(STATIC_LIB)
+        SET_TARGET_PROPERTIES(${name}_static PROPERTIES PREFIX "lib")
+      ENDIF()
+    ENDIF()
+
     SET_TARGET_FLAGS(${name})
   ENDIF()
 
@@ -666,17 +686,10 @@ MACRO(SET_TARGET_LIB name)
 
   IF(IS_STATIC OR IS_SHARED)
     # To prevent other libraries to be linked to the same libraries
-    SET_TARGET_PROPERTIES(${name} PROPERTIES LINK_INTERFACE_LIBRARIES "")
+    SET_TARGET_PROPERTIES(${name} PROPERTIES INTERFACE_LINK_LIBRARIES "")
 
     IF(STATIC_LIB)
-      SET_TARGET_PROPERTIES(${name}_static PROPERTIES LINK_INTERFACE_LIBRARIES "")
-    ENDIF()
-
-    IF(MSVC AND WITH_PREFIX_LIB)
-      SET_TARGET_PROPERTIES(${name} PROPERTIES PREFIX "lib")
-      IF(STATIC_LIB)
-        SET_TARGET_PROPERTIES(${name}_static PROPERTIES PREFIX "lib")
-      ENDIF()
+      SET_TARGET_PROPERTIES(${name}_static PROPERTIES INTERFACE_LINK_LIBRARIES "")
     ENDIF()
 
     IF(WIN32)
@@ -1572,6 +1585,7 @@ MACRO(INIT_BUILD_FLAGS)
           
           SET(DEBUG_CFLAGS "${DEBUG_CFLAGS} -marm")
           SET(RELEASE_CFLAGS "${RELEASE_CFLAGS} -mthumb")
+          SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -mthumb")
         ELSE()
           ADD_PLATFORM_FLAGS("-funswitch-loops")
 
