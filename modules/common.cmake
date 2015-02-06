@@ -305,88 +305,6 @@ MACRO(CREATE_SOURCE_GROUPS DIR FILES)
   ENDIF()
 ENDMACRO(CREATE_SOURCE_GROUPS)
 
-MACRO(GET_INTERMEDIATE_PDB_FILENAME name output)
-  # determine output directory based on target type
-  GET_TARGET_PROPERTY(_targetType ${name} TYPE)
-
-  IF(${_targetType} STREQUAL STATIC_LIBRARY)
-    # intermediate and final PDB are identical
-    GET_FINAL_PDB_FILENAME(${name} output)
-  ELSE()
-    SET(${output} "vc${MSVC_TOOLSET}")
-  ENDIF()
-ENDMACRO()
-
-MACRO(GET_INTERMEDIATE_PDB_DIRECTORY name output)
-  # determine output directory based on target type
-  GET_TARGET_PROPERTY(_targetType ${name} TYPE)
-
-  IF(${_targetType} STREQUAL STATIC_LIBRARY)
-    # intermediate and final PDB are identical
-    GET_FINAL_PDB_DIRECTORY(${name} output)
-  ELSE()
-    # set it to a temporary directory because the true PDB file is set using /PDB instead of /Fd
-    # use a simple path to put intermediary PDB file
-    IF(NMAKE)
-      SET(${output} "${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/${name}.dir")
-    ELSE()
-      SET(${output} "${CMAKE_CURRENT_BINARY_DIR}/${name}.dir/Debug")
-    ENDIF()
-  ENDIF()
-ENDMACRO()
-
-MACRO(GET_INTERMEDIATE_PDB_FULLPATH name output)
-  GET_INTERMEDIATE_PDB_FILENAME(${name} _PDB_FILENAME)
-  GET_INTERMEDIATE_PDB_DIRECTORY(${name} _PDB_DIRECTORY)
-
-  SET(${output} "${_PDB_DIRECTORY}/${_PDB_FILENAME}.pdb")
-ENDMACRO()
-
-MACRO(GET_FINAL_PDB_FILENAME name output)
-  # determine target prefix
-  GET_TARGET_PROPERTY(_targetPrefix ${name} PREFIX)
-  IF(${_targetPrefix} MATCHES NOTFOUND)
-    SET(_targetPrefix "")
-  ENDIF()
-
-  # determine target postfix
-  GET_TARGET_PROPERTY(_targetPostfix ${name} DEBUG_POSTFIX)
-
-  IF(${_targetPostfix} MATCHES NOTFOUND)
-    SET(_targetPostfix "${_DEBUG_POSTFIX}")
-  ENDIF()
-
-  SET(${output} "${_targetPrefix}${name}${_targetPostfix}")
-ENDMACRO()
-
-MACRO(GET_FINAL_PDB_DIRECTORY name output)
-  # determine output directory based on target type
-  GET_TARGET_PROPERTY(_targetType ${name} TYPE)
-
-  # use correct output path
-  IF(${_targetType} STREQUAL STATIC_LIBRARY)
-    SET(_PDB_DIRECTORY ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY})
-  ELSE()
-    SET(_PDB_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
-  ENDIF()
-
-  # fix location depending on using NMake or VC++
-  IF(NMAKE)
-    SET(_PDB_DIRECTORY ${_PDB_DIRECTORY})
-  ELSE()
-    SET(_PDB_DIRECTORY ${_PDB_DIRECTORY}/Debug)
-  ENDIF()
-  
-  SET(${output} ${_PDB_DIRECTORY})
-ENDMACRO()
-
-MACRO(GET_FINAL_PDB_FULLPATH name output)
-  GET_FINAL_PDB_DIRECTORY(${name} _PDB_DIRECTORY)
-  GET_FINAL_PDB_FILENAME(${name} _PDB_FILENAME)
-
-  SET(${output} "${_PDB_DIRECTORY}/${_PDB_FILENAME}.pdb")
-ENDMACRO()
-
 MACRO(SET_TARGET_EXECUTABLE _TYPE name)
   IF(NOT BUILD_FLAGS_SETUP)
     SETUP_BUILD_FLAGS()
@@ -747,29 +665,8 @@ MACRO(SET_TARGET_LIB name)
           INSTALL(TARGETS ${name}_static RUNTIME DESTINATION ${BIN_PREFIX} LIBRARY DESTINATION ${LIBRARY_DEST})
         ENDIF()
       ENDIF()
-      # copy also PDB files in installation directory for Visual C++
-      IF(MSVC)
-        IF(IS_STATIC)
-          IF(STATIC_LIB)
-            SET(_name "${name}_static")
-          ELSE()
-            SET(_name "${name}")
-          ENDIF()
 
-          # Destination PDB filename
-          GET_FINAL_PDB_FULLPATH(${_name} _OUTPUT_FULLPATH)
-          
-          # copy PDB file together with LIB
-          INSTALL(FILES ${_OUTPUT_FULLPATH} DESTINATION ${LIB_PREFIX} CONFIGURATIONS Debug)
-        ENDIF()
-        IF(IS_SHARED)
-          # Destination PDB filename
-          GET_FINAL_PDB_FULLPATH(${name} _OUTPUT_FULLPATH)
- 
-          # copy PDB file together with DLL
-          INSTALL(FILES ${_OUTPUT_FULLPATH} DESTINATION ${BIN_PREFIX} CONFIGURATIONS Debug)
-        ENDIF()
-      ENDIF()
+      INSTALL_LIBRARY_PDB(${name})
     ELSE()
       IF(IS_SHARED)
         # copy only DLL because we don't need development files
@@ -907,19 +804,7 @@ MACRO(SET_TARGET_PLUGIN name)
       ENDIF()
     ENDIF()
 
-    # copy also PDB files in installation directory for Visual C++
-    IF(MSVC AND WITH_INSTALL_LIBRARIES)
-      # Destination PDB filename
-      GET_FINAL_PDB_FULLPATH(${name} _OUTPUT_FULLPATH)
-
-      IF(WITH_STATIC_PLUGINS)
-        # copy PDB file together with lib
-        INSTALL(FILES ${_OUTPUT_FULLPATH} DESTINATION ${LIB_PREFIX} CONFIGURATIONS Debug)
-      ELSE()
-        # copy PDB file together with DLL
-        INSTALL(FILES ${_OUTPUT_FULLPATH} DESTINATION ${PLUGIN_PREFIX} CONFIGURATIONS Debug)
-      ENDIF()
-    ENDIF()
+    INSTALL_PLUGIN_PDB(${name})
   ENDIF()
 ENDMACRO(SET_TARGET_PLUGIN)
 
@@ -980,21 +865,8 @@ MACRO(SET_TARGET_FLAGS name)
 
   TARGET_LINK_LIBRARIES(${name} ${CMAKE_THREAD_LIBS_INIT})
 
-  IF(NOT "${type}" STREQUAL STATIC_LIBRARY)
-    IF(ANDROID)
-      TARGET_LINK_LIBRARIES(${name} ${STL_LIBRARY})
-    ENDIF()
-
-    IF(MSVC)
-      GET_TARGET_PROPERTY(_LINK_FLAGS ${name} LINK_FLAGS)
-      IF(NOT _LINK_FLAGS)
-        SET(_LINK_FLAGS "")
-      ENDIF()
-      SET_TARGET_PROPERTIES(${name} PROPERTIES
-        VERSION ${VERSION}
-        SOVERSION ${VERSION_MAJOR}
-        LINK_FLAGS "/VERSION:${VERSION_MAJOR}.${VERSION_MINOR} ${_LINK_FLAGS}")
-    ENDIF()
+  IF(NOT "${type}" STREQUAL STATIC_LIBRARY AND ANDROID)
+    TARGET_LINK_LIBRARIES(${name} ${STL_LIBRARY})
   ENDIF()
 
   IF(WITH_STLPORT)
@@ -1023,38 +895,7 @@ MACRO(SET_TARGET_FLAGS name)
 
   SET_TARGET_PROPERTIES(${name} PROPERTIES DEBUG_POSTFIX "${_DEBUG_POSTFIX}" RELEASE_POSTFIX "${_RELEASE_POSTFIX}")
 
-  IF(MSVC)
-    IF("${type}" STREQUAL STATIC_LIBRARY)
-      # final and intermediate PDB are identical
-      GET_FINAL_PDB_FILENAME(${name} _PDB_FILENAME)
-      GET_FINAL_PDB_DIRECTORY(${name} _PDB_DIRECTORY)
-
-      # define all properties supported by CMake for PDB (if not supported, it won't change anything)
-      SET_TARGET_PROPERTIES(${name} PROPERTIES COMPILE_PDB_OUTPUT_DIRECTORY_DEBUG "${_PDB_DIRECTORY}" COMPILE_PDB_NAME_DEBUG "${_PDB_FILENAME}")
-      SET_TARGET_PROPERTIES(${name} PROPERTIES PDB_OUTPUT_DIRECTORY_DEBUG "${_PDB_DIRECTORY}" PDB_NAME_DEBUG "${_PDB_FILENAME}")
-    ELSEIF("${type}" STREQUAL EXECUTABLE)
-      SET_TARGET_PROPERTIES(${name} PROPERTIES COMPILE_FLAGS "/GA")
-    ELSEIF("${type}" STREQUAL SHARED_LIBRARY)
-      # final PDB
-      GET_FINAL_PDB_FILENAME(${name} _PDB_FILENAME)
-      GET_FINAL_PDB_DIRECTORY(${name} _PDB_DIRECTORY)
-
-      # intermediate PDB
-      GET_INTERMEDIATE_PDB_FILENAME(${name} _COMPILE_PDB_FILENAME)
-      GET_INTERMEDIATE_PDB_DIRECTORY(${name} _COMPILE_PDB_DIRECTORY)
-
-      # define all properties supported by CMake for PDB (if not supported, it won't change anything)
-      SET_TARGET_PROPERTIES(${name} PROPERTIES COMPILE_PDB_OUTPUT_DIRECTORY_DEBUG "${_COMPILE_PDB_DIRECTORY}" COMPILE_PDB_NAME_DEBUG "${_COMPILE_PDB_FILENAME}")
-      SET_TARGET_PROPERTIES(${name} PROPERTIES PDB_OUTPUT_DIRECTORY_DEBUG "${_PDB_DIRECTORY}" PDB_NAME_DEBUG "${_PDB_FILENAME}")
-    ENDIF()
-
-    IF(MANUALLY_MANAGE_PDB_FLAG)
-      GET_INTERMEDIATE_PDB_FULLPATH(${name} _PDB_FULLPATH)
-
-      # define /Fd flag manually for PDB
-      SET_PROPERTY(TARGET ${name} APPEND_STRING PROPERTY COMPILE_FLAGS " /Fd${_PDB_FULLPATH}")
-    ENDIF()
-  ENDIF()
+  SET_TARGET_FLAGS_MSVC(${name})
 ENDMACRO(SET_TARGET_FLAGS)
 
 # Set special flags to sources depending on specific language based on their extension
