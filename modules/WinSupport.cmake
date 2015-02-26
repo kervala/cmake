@@ -4,7 +4,7 @@ SET(ENV_CONFIGURATION $ENV{CONFIGURATION})
 # Force configuration set by Windows SDK
 IF(NOT CMAKE_BUILD_TYPE AND ENV_CONFIGURATION)
   SET(CMAKE_BUILD_TYPE ${ENV_CONFIGURATION} CACHE STRING "" FORCE)
-ENDIF(NOT CMAKE_BUILD_TYPE AND ENV_CONFIGURATION)
+ENDIF()
 
 MACRO(SIGN_FILE_WINDOWS TARGET)
   IF(WITH_SIGN_FILE AND WINSDK_SIGNTOOL AND CMAKE_BUILD_TYPE STREQUAL "Release")
@@ -14,8 +14,8 @@ MACRO(SIGN_FILE_WINDOWS TARGET)
 #      POST_BUILD
 #      COMMAND ${WINSDK_SIGNTOOL} sign ${filename}
 #      VERBATIM)
-  ENDIF(WITH_SIGN_FILE AND WINSDK_SIGNTOOL AND CMAKE_BUILD_TYPE STREQUAL "Release")
-ENDMACRO(SIGN_FILE_WINDOWS)
+  ENDIF()
+ENDMACRO()
 
 ################################################################################ 
 # MACRO_ADD_INTERFACES(idl_files...) 
@@ -33,7 +33,7 @@ MACRO (MACRO_ADD_INTERFACES _output_list)
   IF(NOT WINSDK_MIDL)
     MESSAGE(FATAL_ERROR "midl not found, please check your Windows SDK installation")
     RETURN()
-  ENDIF(NOT WINSDK_MIDL)
+  ENDIF()
 
   FOREACH(_in_FILE ${ARGN}) 
     GET_FILENAME_COMPONENT(_out_FILE ${_in_FILE} NAME_WE) 
@@ -57,7 +57,7 @@ MACRO (MACRO_ADD_INTERFACES _output_list)
     SET_SOURCE_FILES_PROPERTIES(${_in_FILE} PROPERTIES HEADER_FILE_ONLY TRUE)
 
     SET(${_output_list} ${${_output_list}} ${_out_header})
-  ENDFOREACH(_in_FILE ${ARGN})
+  ENDFOREACH()
 ENDMACRO (MACRO_ADD_INTERFACES)
 
 ################################################################################ 
@@ -72,7 +72,13 @@ MACRO(GET_INTERMEDIATE_PDB_FILENAME name output)
     # intermediate and final PDB are identical
     GET_FINAL_PDB_FILENAME(${name} output)
   ELSE()
-    SET(${output} "vc${MSVC_TOOLSET}")
+    # determine target prefix
+    GET_TARGET_PROPERTY(_targetPrefix ${name} PREFIX)
+    IF(${_targetPrefix} MATCHES NOTFOUND)
+      SET(_targetPrefix "")
+    ENDIF()
+
+    SET(${output} "${_targetPrefix}vc${MSVC_TOOLSET}")
   ENDIF()
 ENDMACRO()
 
@@ -158,27 +164,42 @@ MACRO(SET_TARGET_FLAGS_MSVC name)
       ENDIF()
       SET_TARGET_PROPERTIES(${name} PROPERTIES LINK_FLAGS "/VERSION:${VERSION_MAJOR}.${VERSION_MINOR} ${_LINK_FLAGS}")
     ENDIF()
-    
-    IF("${type}" STREQUAL STATIC_LIBRARY)
+
+    IF("${type}" STREQUAL "STATIC_LIBRARY")
       # final and intermediate PDB are identical
       GET_FINAL_PDB_FILENAME(${name} _PDB_FILENAME)
       GET_FINAL_PDB_DIRECTORY(${name} _PDB_DIRECTORY)
 
+      # Remove lib prefix if CMake added it itself
+      IF(WITH_PREFIX_LIB)
+        STRING(REGEX REPLACE "^lib" "" _PDB_FILENAME ${_PDB_FILENAME})
+      ENDIF()
+
       # define all properties supported by CMake for PDB (if not supported, it won't change anything)
       SET_TARGET_PROPERTIES(${name} PROPERTIES COMPILE_PDB_OUTPUT_DIRECTORY_DEBUG "${_PDB_DIRECTORY}" COMPILE_PDB_NAME_DEBUG "${_PDB_FILENAME}")
       SET_TARGET_PROPERTIES(${name} PROPERTIES PDB_OUTPUT_DIRECTORY_DEBUG "${_PDB_DIRECTORY}" PDB_NAME_DEBUG "${_PDB_FILENAME}")
-    ELSEIF("${type}" STREQUAL EXECUTABLE)
+    ELSEIF("${type}" STREQUAL "EXECUTABLE")
       SET_TARGET_PROPERTIES(${name} PROPERTIES COMPILE_FLAGS "/GA")
       SET_TARGET_PROPERTIES(${name} PROPERTIES VERSION ${VERSION} SOVERSION ${VERSION_MAJOR})
-    ELSEIF("${type}" STREQUAL SHARED_LIBRARY)
+    ELSEIF("${type}" STREQUAL "SHARED_LIBRARY")
       # final PDB
       GET_FINAL_PDB_FILENAME(${name} _PDB_FILENAME)
       GET_FINAL_PDB_DIRECTORY(${name} _PDB_DIRECTORY)
+
+      # Remove lib prefix if CMake added it itself
+      IF(WITH_PREFIX_LIB)
+        STRING(REGEX REPLACE "^lib" "" _PDB_FILENAME ${_PDB_FILENAME})
+      ENDIF()
 
       # intermediate PDB
       GET_INTERMEDIATE_PDB_FILENAME(${name} _COMPILE_PDB_FILENAME)
       GET_INTERMEDIATE_PDB_DIRECTORY(${name} _COMPILE_PDB_DIRECTORY)
 
+      # Remove lib prefix if CMake added it itself
+      IF(WITH_PREFIX_LIB)
+        STRING(REGEX REPLACE "^lib" "" _COMPILE_PDB_FILENAME ${_COMPILE_PDB_FILENAME})
+      ENDIF()
+      
       # define all properties supported by CMake for PDB (if not supported, it won't change anything)
       SET_TARGET_PROPERTIES(${name} PROPERTIES COMPILE_PDB_OUTPUT_DIRECTORY_DEBUG "${_COMPILE_PDB_DIRECTORY}" COMPILE_PDB_NAME_DEBUG "${_COMPILE_PDB_FILENAME}")
       SET_TARGET_PROPERTIES(${name} PROPERTIES PDB_OUTPUT_DIRECTORY_DEBUG "${_PDB_DIRECTORY}" PDB_NAME_DEBUG "${_PDB_FILENAME}")
