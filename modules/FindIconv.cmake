@@ -1,9 +1,9 @@
 # - Try to find Iconv on Mac OS X
-# Once done this will define 
+# Once done this will define
 # 
-#  ICONV_FOUND - system has Iconv 
-#  ICONV_INCLUDE_DIR - the Iconv include directory 
-#  ICONV_LIBRARIES - Link these to use Iconv 
+#  ICONV_FOUND - system has Iconv
+#  ICONV_INCLUDE_DIR - the Iconv include directory
+#  ICONV_LIBRARIES - Link these to use Iconv
 #  ICONV_SECOND_ARGUMENT_IS_CONST - the second argument for iconv() is const
 # 
 
