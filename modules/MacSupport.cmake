@@ -32,10 +32,7 @@ MACRO(SIGN_FILE_MAC _TARGET)
     ENDIF()
     SET_TARGET_PROPERTIES(${_TARGET} PROPERTIES
       XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY[variant=Debug] ${IOS_DEVELOPER}
-      XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY[variant=Release] ${IOS_DISTRIBUTION}
-      XCODE_ATTRIBUTE_INSTALL_PATH "$(LOCAL_APPS_DIR)"
-      XCODE_ATTRIBUTE_INSTALL_PATH_VALIDATE_PRODUCT "YES"
-      XCODE_ATTRIBUTE_COMBINE_HIDPI_IMAGES "NO")
+      XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY[variant=Release] ${IOS_DISTRIBUTION})
   ELSE()
 #   SET_TARGET_PROPERTIES(${target} PROPERTIES
 #     XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "Mac Developer")
@@ -58,7 +55,7 @@ MACRO(INIT_MAC)
   SET(MAC_ITUNESARTWORK)
   SET(MAC_ITUNESARTWORK2X)
   SET(MAC_MOBILEPRIVISION)
-  
+
   # Regex filter for Mac files
   SET(MAC_FILES_FILTER "(\\.(xib|strings|icns|plist|framework|mobileprovision)|iTunesArtwork.*\\.png|\\.lproj/.*)$")
 ENDMACRO()
@@ -154,11 +151,15 @@ MACRO(INIT_BUNDLE _TARGET)
     ENDIF()
 
     IF(NOT MACOSX_BUNDLE_LONG_VERSION_STRING)
-      SET(MACOSX_BUNDLE_LONG_VERSION_STRING "${PRODUCT} version ${VERSION}")
+      SET(MACOSX_BUNDLE_LONG_VERSION_STRING "${PRODUCT_XML} version ${VERSION}")
+    ENDIF()
+
+    IF(NOT PRODUCT_XML)
+      SET(PRODUCT_XML "${PRODUCT}")
     ENDIF()
 
     IF(NOT MACOSX_BUNDLE_BUNDLE_NAME)
-      SET(MACOSX_BUNDLE_BUNDLE_NAME "${PRODUCT}")
+      SET(MACOSX_BUNDLE_BUNDLE_NAME "${PRODUCT_XML}")
     ENDIF()
 
     IF(NOT MACOSX_BUNDLE_SHORT_VERSION_STRING)
@@ -172,36 +173,83 @@ MACRO(INIT_BUNDLE _TARGET)
     IF(NOT MACOSX_BUNDLE_COPYRIGHT)
       SET(MACOSX_BUNDLE_COPYRIGHT "Copyright ${YEAR} ${AUTHOR}")
     ENDIF()
-    
+
     IF(NOT CPACK_BUNDLE_NAME)
       SET(CPACK_BUNDLE_NAME "${PRODUCT_FIXED}")
     ENDIF()
 
+    IF(NOT MACOSX_BUNDLE_EXECUTABLE_NAME)
+      SET(MACOSX_BUNDLE_EXECUTABLE_NAME "${PRODUCT_FIXED}")
+    ENDIF()
+
     # Make sure the 'Resources' Directory is correctly created before we build
     ADD_CUSTOM_COMMAND(TARGET ${_TARGET} PRE_BUILD COMMAND mkdir -p ${RESOURCES_DIR})
+
+    # Manage Info.plist ourself
+    IF(NOT XCODE)
+      # Configure Info.plist
+      IF(MAC_INFO_PLIST)
+        CONFIGURE_FILE(${MAC_INFO_PLIST} ${CMAKE_BINARY_DIR}/Info-${_TARGET}.plist)
+      ENDIF()
+
+      # Copy right Info.plist to right location
+      ADD_CUSTOM_COMMAND(TARGET ${_TARGET} PRE_BUILD
+        COMMAND mkdir -p ${OUTPUT_DIR}/Contents/MacOS
+        COMMAND cp ${CMAKE_BINARY_DIR}/Info-${_TARGET}.plist ${CONTENTS_DIR}/Info.plist)
+    ENDIF()
 ENDMACRO()
 
-MACRO(SET_TARGET_FLAGS_XCODE _TARGET)
-  IF(XCODE)
-    IF(IOS AND IOS_VERSION)
-      SET_TARGET_PROPERTIES(${_TARGET} PROPERTIES
-        XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${IOS_VERSION}
-        XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
-        XCODE_ATTRIBUTE_VALID_ARCHS "armv7") # armv6 armv7 armv7s
+MACRO(SET_TARGET_FLAGS_MAC _TARGET)
+  IF(APPLE)
+    IF(XCODE)
+      IF(IOS AND IOS_VERSION)
+        SET_TARGET_PROPERTIES(${_TARGET} PROPERTIES
+          XCODE_ATTRIBUTE_ENABLE_TESTABILITY[variant=Debug] YES
+          XCODE_ATTRIBUTE_INSTALL_PATH "$(LOCAL_APPS_DIR)"
+          XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${IOS_VERSION}
+          XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
+          XCODE_ATTRIBUTE_VALID_ARCHS "armv7;arm64" # armv6 armv7 armv7s arm64
+          XCODE_ATTRIBUTE_VALIDATE_PRODUCT YES
+        )
+      ENDIF()
+
+      IF(WITH_VISIBILITY_HIDDEN)
+        SET_TARGET_PROPERTIES(${_TARGET} PROPERTIES
+          XCODE_ATTRIBUTE_GCC_SYMBOLS_PRIVATE_EXTERN YES
+          XCODE_ATTRIBUTE_GCC_INLINES_ARE_PRIVATE_EXTERN YES)
+      ENDIF()
+
+      IF(NOT WITH_EXCEPTIONS)
+        SET_TARGET_PROPERTIES(${_TARGET} PROPERTIES XCODE_ATTRIBUTE_GCC_ENABLE_CPP_EXCEPTIONS NO)
+      ENDIF()
+
+      IF(NOT WITH_RTTI)
+        SET_TARGET_PROPERTIES(${_TARGET} PROPERTIES XCODE_ATTRIBUTE_GCC_ENABLE_CPP_RTTI NO)
+      ENDIF()
     ENDIF()
 
-    IF(WITH_VISIBILITY_HIDDEN)
-      SET_TARGET_PROPERTIES(${_TARGET} PROPERTIES
-        XCODE_ATTRIBUTE_GCC_SYMBOLS_PRIVATE_EXTERN YES
-        XCODE_ATTRIBUTE_GCC_INLINES_ARE_PRIVATE_EXTERN YES)
-    ENDIF()
+    GET_TARGET_PROPERTY(type ${_TARGET} TYPE)
 
-    IF(NOT WITH_EXCEPTIONS)
-      SET_TARGET_PROPERTIES(${_TARGET} PROPERTIES XCODE_ATTRIBUTE_GCC_ENABLE_CPP_EXCEPTIONS NO)
-    ENDIF()
-
-    IF(NOT WITH_RTTI)
-      SET_TARGET_PROPERTIES(${_TARGET} PROPERTIES XCODE_ATTRIBUTE_GCC_ENABLE_CPP_RTTI NO)
+    IF("${type}" STREQUAL "EXECUTABLE")
+      IF(XCODE)
+        IF(MACOSX_BUNDLE_GUI_IDENTIFIER)
+          SET_TARGET_PROPERTIES(${_TARGET} PROPERTIES
+            XCODE_ATTRIBUTE_COMBINE_HIDPI_IMAGES NO
+            XCODE_ATTRIBUTE_ENABLE_BITCODE NO
+            XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER "${MACOSX_BUNDLE_GUI_IDENTIFIER}"
+          )
+        ENDIF()
+      ENDIF()
+    ELSE()
+      IF(XCODE)
+        SET_TARGET_PROPERTIES(${_TARGET} PROPERTIES
+          XCODE_ATTRIBUTE_ENABLE_BITCODE YES
+          XCODE_ATTRIBUTE_SKIP_INSTALL YES
+        )
+      ELSEIF(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER "6.1.0")
+        # Add bitcode for compatibility with new Xcode versions		
+        TARGET_COMPILE_OPTIONS(${_TARGET} PRIVATE "-fembed-bitcode-marker")
+      ENDIF()
     ENDIF()
   ENDIF()
 ENDMACRO()
@@ -229,6 +277,11 @@ MACRO(INIT_BUILD_FLAGS_MAC)
           ELSEIF(_ARCH STREQUAL "x86_64")
             SET(_ARCHS "${_ARCHS} x86_64")
             SET(TARGET_X64 1)
+            MATH(EXPR TARGETS_COUNT "${TARGETS_COUNT}+1")
+          ELSEIF(_ARCH STREQUAL "arm64")
+            SET(_ARCHS "${_ARCHS} arm64")
+            SET(TARGET_ARM64 1)
+            SET(TARGET_ARM 1)
             MATH(EXPR TARGETS_COUNT "${TARGETS_COUNT}+1")
           ELSEIF(_ARCH STREQUAL "armv7s")
             SET(_ARCHS "${_ARCHS} armv7s")
@@ -260,23 +313,27 @@ MACRO(INIT_BUILD_FLAGS_MAC)
 
       IF(TARGETS_COUNT EQUAL 1)
         IF(TARGET_ARM)
+          IF(TARGET_ARM64)
+            ADD_PLATFORM_FLAGS("-arch arm64 -DHAVE_ARM64")
+          ENDIF()
+
           IF(TARGET_ARMV7S)
-            ADD_PLATFORM_FLAGS("-arch armv7s -DHAVE_ARMV7S")
+            ADD_PLATFORM_FLAGS("-arch armv7s -mthumb -DHAVE_ARMV7S")
           ENDIF()
 
           IF(TARGET_ARMV7)
-            ADD_PLATFORM_FLAGS("-arch armv7 -DHAVE_ARMV7")
+            ADD_PLATFORM_FLAGS("-arch armv7 -mthumb -DHAVE_ARMV7")
           ENDIF()
 
           IF(TARGET_ARMV6)
-            ADD_PLATFORM_FLAGS("-arch armv6 -DHAVE_ARMV6")
+            ADD_PLATFORM_FLAGS("-arch armv6 -mthumb -DHAVE_ARMV6")
           ENDIF()
 
           IF(TARGET_ARMV5)
-            ADD_PLATFORM_FLAGS("-arch armv5 -DHAVE_ARMV5")
+            ADD_PLATFORM_FLAGS("-arch armv5 -mthumb -DHAVE_ARMV5")
           ENDIF()
 
-          ADD_PLATFORM_FLAGS("-mthumb -DHAVE_ARM")
+          ADD_PLATFORM_FLAGS("-DHAVE_ARM")
         ENDIF()
 
         IF(TARGET_X64)
@@ -291,23 +348,25 @@ MACRO(INIT_BUILD_FLAGS_MAC)
       ELSEIF(TARGETS_COUNT EQUAL 0)
         # Not using CMAKE_OSX_ARCHITECTURES, HAVE_XXX already defined before
         IF(TARGET_ARM)
+          IF(TARGET_ARM64)
+            ADD_PLATFORM_FLAGS("-arch arm64")
+          ENDIF()
+
           IF(TARGET_ARMV7S)
-            ADD_PLATFORM_FLAGS("-arch armv7s")
+            ADD_PLATFORM_FLAGS("-arch armv7s -mthumb")
           ENDIF()
 
           IF(TARGET_ARMV7)
-            ADD_PLATFORM_FLAGS("-arch armv7")
+            ADD_PLATFORM_FLAGS("-arch armv7 -mthumb")
           ENDIF()
 
           IF(TARGET_ARMV6)
-            ADD_PLATFORM_FLAGS("-arch armv6")
+            ADD_PLATFORM_FLAGS("-arch armv6 -mthumb")
           ENDIF()
 
           IF(TARGET_ARMV5)
-            ADD_PLATFORM_FLAGS("-arch armv5")
+            ADD_PLATFORM_FLAGS("-arch armv5 -mthumb")
           ENDIF()
-
-          ADD_PLATFORM_FLAGS("-mthumb")
         ENDIF()
 
         IF(TARGET_X64)
@@ -332,6 +391,10 @@ MACRO(INIT_BUILD_FLAGS_MAC)
           ADD_PLATFORM_FLAGS("-Xarch_armv7s -mthumb -Xarch_armv7s -DHAVE_ARM -Xarch_armv7s -DHAVE_ARMV7 -Xarch_armv7s -DHAVE_ARMV7S")
         ENDIF()
 
+        IF(TARGET_ARM64)
+          ADD_PLATFORM_FLAGS("-Xarch_arm64 -DHAVE_ARM -Xarch_arm64 -DHAVE_ARM64")
+        ENDIF()
+
         IF(TARGET_X86)
           ADD_PLATFORM_FLAGS("-Xarch_i386 -DHAVE_X86")
         ENDIF()
@@ -350,12 +413,22 @@ MACRO(INIT_BUILD_FLAGS_MAC)
 
         IF(IOS_VERSION)
           PARSE_VERSION_STRING(${IOS_VERSION} IOS_VERSION_MAJOR IOS_VERSION_MINOR IOS_VERSION_PATCH)
-          CONVERT_VERSION_NUMBER(IOS_VERSION_NUMBER 10 ${IOS_VERSION_MAJOR} ${IOS_VERSION_MINOR} ${IOS_VERSION_PATCH})
+          CONVERT_VERSION_NUMBER(IOS_VERSION_NUMBER 100 ${IOS_VERSION_MAJOR} ${IOS_VERSION_MINOR} ${IOS_VERSION_PATCH})
 
           ADD_PLATFORM_FLAGS("-D__IPHONE_OS_VERSION_MIN_REQUIRED=${IOS_VERSION_NUMBER}")
         ENDIF()
 
         IF(CMAKE_IOS_SYSROOT)
+          IF(TARGET_ARM64)
+            IF(TARGETS_COUNT GREATER 1)
+              SET(XARCH "-Xarch_arm64 ")
+            ENDIF()
+
+            ADD_PLATFORM_FLAGS("${XARCH}-isysroot${CMAKE_IOS_SYSROOT}")
+            ADD_PLATFORM_FLAGS("${XARCH}-miphoneos-version-min=${IOS_VERSION}")
+            SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} ${XARCH}-Wl,-iphoneos_version_min,${IOS_VERSION}")
+          ENDIF()
+
           IF(TARGET_ARMV7S)
             IF(TARGETS_COUNT GREATER 1)
               SET(XARCH "-Xarch_armv7s ")
@@ -395,7 +468,10 @@ MACRO(INIT_BUILD_FLAGS_MAC)
 
             ADD_PLATFORM_FLAGS("${XARCH}-isysroot${CMAKE_IOS_SIMULATOR_SYSROOT}")
             ADD_PLATFORM_FLAGS("${XARCH}-mios-simulator-version-min=${IOS_VERSION}")
-            SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} ${XARCH}-Wl,-macosx_version_min,${CMAKE_OSX_DEPLOYMENT_TARGET}")
+
+            IF(CMAKE_OSX_DEPLOYMENT_TARGET)
+              SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} ${XARCH}-Wl,-macosx_version_min,${CMAKE_OSX_DEPLOYMENT_TARGET}")
+            ENDIF()
           ENDIF()
 
           IF(TARGET_X86)
@@ -405,15 +481,23 @@ MACRO(INIT_BUILD_FLAGS_MAC)
 
             ADD_PLATFORM_FLAGS("${XARCH}-isysroot${CMAKE_IOS_SIMULATOR_SYSROOT}")
             ADD_PLATFORM_FLAGS("${XARCH}-mios-simulator-version-min=${IOS_VERSION}")
-            SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} ${XARCH}-Wl,-macosx_version_min,${CMAKE_OSX_DEPLOYMENT_TARGET}")
+
+            IF(CMAKE_OSX_DEPLOYMENT_TARGET)
+              SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} ${XARCH}-Wl,-macosx_version_min,${CMAKE_OSX_DEPLOYMENT_TARGET}")
+            ENDIF()
           ENDIF()
         ENDIF()
       ELSE()
         # Always force -mmacosx-version-min to override environement variable
         # __MAC_OS_X_VERSION_MIN_REQUIRED
-        SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -Wl,-macosx_version_min,${CMAKE_OSX_DEPLOYMENT_TARGET}")
+        IF(CMAKE_OSX_DEPLOYMENT_TARGET)
+          SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -Wl,-macosx_version_min,${CMAKE_OSX_DEPLOYMENT_TARGET}")
+        ENDIF()
       ENDIF()
     ENDIF()
+
+    # Keep all static Objective-C symbols
+    SET(PLATFORM_LINKFLAGS "${PLATFORM_LINKFLAGS} -ObjC")
   ENDIF()
 ENDMACRO()
 
@@ -454,6 +538,7 @@ MACRO(INSTALL_MAC_RESOURCES _TARGET)
 
     IF(NOT XCODE)
       ADD_CUSTOM_COMMAND(TARGET ${_TARGET} POST_BUILD COMMAND cp ARGS ${MAC_RESOURCES_DIR}/PkgInfo ${CONTENTS_DIR})
+      ADD_CUSTOM_COMMAND(TARGET ${_TARGET} POST_BUILD COMMAND cp ARGS ${CMAKE_BINARY_DIR}/archived-expanded-entitlements-${_TARGET}.xcent ${CONTENTS_DIR}/archived-expanded-entitlements.xcent)
     ENDIF()
   ENDIF()
 
@@ -497,7 +582,7 @@ MACRO(INSTALL_RESOURCES_MAC _TARGET _DIR)
     IF(CPACK_PACKAGE_DESCRIPTION_FILE)
       ADD_CUSTOM_COMMAND(TARGET ${_TARGET} PRE_BUILD COMMAND cp ARGS ${CPACK_PACKAGE_DESCRIPTION_FILE} ${RESOURCES_DIR})
     ENDIF()
-    
+
     IF(CPACK_RESOURCE_FILE_LICENSE)
       ADD_CUSTOM_COMMAND(TARGET ${_TARGET} PRE_BUILD COMMAND cp ARGS ${CPACK_RESOURCE_FILE_LICENSE} ${RESOURCES_DIR})
     ENDIF()
@@ -523,7 +608,7 @@ MACRO(COMPILE_MAC_XIBS _TARGET)
         ENDIF()
         GET_FILENAME_COMPONENT(NIB_OUTPUT_DIR ${RESOURCES_DIR}/${NIB} PATH)
         ADD_CUSTOM_COMMAND(TARGET ${_TARGET} POST_BUILD
-          COMMAND ${IBTOOL} --errors --warnings --notices --output-format human-readable-text
+          COMMAND ${IBTOOL} --target-device iphone --target-device ipad --errors --warnings --notices --module "${PRODUCT}" --minimum-deployment-target ${IOS_VERSION} --auto-activate-custom-fonts --output-format human-readable-text
             --compile ${RESOURCES_DIR}/${NIB}
             ${XIB}
             --sdk ${CMAKE_IOS_SDK_ROOT}
@@ -536,14 +621,14 @@ ENDMACRO()
 MACRO(FIX_IOS_BUNDLE _TARGET)
   # Fixing Bundle files for iOS
   IF(IOS)
+    IF(XCODE)
+      ADD_CUSTOM_COMMAND(TARGET ${_TARGET} POST_BUILD
+      COMMAND mv ${OUTPUT_DIR}/Contents/Info.plist ${OUTPUT_DIR})
+    ENDIF()
+
     ADD_CUSTOM_COMMAND(TARGET ${_TARGET} POST_BUILD
       COMMAND mv ${OUTPUT_DIR}/Contents/MacOS/* ${OUTPUT_DIR}
-      COMMAND mv ${OUTPUT_DIR}/Contents/Info.plist ${OUTPUT_DIR}
       COMMAND rm -rf ${OUTPUT_DIR}/Contents)
-
-    # Adding other needed files
-    ADD_CUSTOM_COMMAND(TARGET ${_TARGET} POST_BUILD
-      COMMAND cp ARGS ${CMAKE_IOS_SDK_ROOT}/ResourceRules.plist ${CONTENTS_DIR})
   ENDIF()
 ENDMACRO()
 
@@ -552,15 +637,16 @@ MACRO(CREATE_IOS_PACKAGE_TARGET _TARGET)
     # Creating .ipa package
     IF(MAC_ITUNESARTWORK)
       IF(APPSTORE)
-        CONFIGURE_FILE(${MAC_RESOURCES_DIR}/application_store.xcent ${CMAKE_BINARY_DIR}/application.xcent)
+        CONFIGURE_FILE(${MAC_RESOURCES_DIR}/application_store.xcent ${CMAKE_BINARY_DIR}/application-${_TARGET}.xcent)
       ELSE()
-        CONFIGURE_FILE(${MAC_RESOURCES_DIR}/application.xcent ${CMAKE_BINARY_DIR}/application.xcent)
+        CONFIGURE_FILE(${MAC_RESOURCES_DIR}/application.xcent ${CMAKE_BINARY_DIR}/application-${_TARGET}.xcent)
+        CONFIGURE_FILE(${MAC_RESOURCES_DIR}/archived-expanded-entitlements.xcent ${CMAKE_BINARY_DIR}/archived-expanded-entitlements-${_TARGET}.xcent)
       ENDIF()
 
       IF(NOT PACKAGE_NAME)
         SET(PACKAGE_NAME "${PRODUCT_FIXED}")
       ENDIF()
-      
+
       SET(IPA_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PACKAGE_NAME}_ipa)
       SET(IPA ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PACKAGE_NAME}-${VERSION}.ipa)
 
@@ -570,12 +656,12 @@ MACRO(CREATE_IOS_PACKAGE_TARGET _TARGET)
         LIST(APPEND _COMMANDS COMMAND cp "${MAC_ITUNESARTWORK2X}" "${IPA_DIR}/iTunesArtwork@2x")
       ENDIF()
 
-      ADD_CUSTOM_TARGET(packages
+      ADD_CUSTOM_TARGET(${_TARGET}_package
         COMMAND rm -rf "${OUTPUT_DIR}/Contents"
         COMMAND mkdir -p "${IPA_DIR}/Payload"
         COMMAND strip "${CONTENTS_DIR}/${PRODUCT_FIXED}"
         COMMAND security unlock-keychain -p "${KEYCHAIN_PASSWORD}"
-        COMMAND CODESIGN_ALLOCATE=${CMAKE_IOS_DEVELOPER_ROOT}/usr/bin/codesign_allocate codesign -fs "${IOS_DISTRIBUTION}" "--resource-rules=${CONTENTS_DIR}/ResourceRules.plist" --entitlements "${CMAKE_BINARY_DIR}/application.xcent" "${CONTENTS_DIR}"
+        COMMAND CODESIGN_ALLOCATE=${CMAKE_IOS_DEVELOPER_ROOT}/usr/bin/codesign_allocate codesign -fs "${IOS_DISTRIBUTION}" --entitlements "${CMAKE_BINARY_DIR}/application-${_TARGET}.xcent" "${CONTENTS_DIR}"
         COMMAND cp -R "${OUTPUT_DIR}" "${IPA_DIR}/Payload"
         COMMAND cp "${MAC_ITUNESARTWORK}" "${IPA_DIR}/iTunesArtwork"
         ${_COMMANDS}
@@ -584,8 +670,14 @@ MACRO(CREATE_IOS_PACKAGE_TARGET _TARGET)
         COMMENT "Creating IPA archive..."
         SOURCES ${MAC_ITUNESARTWORK}
         VERBATIM)
-      ADD_DEPENDENCIES(packages ${_TARGET})
-      SET_TARGET_LABEL(packages "PACKAGE")
+      ADD_DEPENDENCIES(${_TARGET}_package ${_TARGET})
+      SET_TARGET_LABEL(${_TARGET}_package "${_TARGET} PACKAGE")
+
+      IF(NOT TARGET packages)
+        ADD_CUSTOM_TARGET(packages)
+      ENDIF()
+
+      ADD_DEPENDENCIES(packages ${_TARGET}_package)
     ENDIF()
   ENDIF()
 ENDMACRO()
