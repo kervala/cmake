@@ -190,12 +190,11 @@ MACRO(INIT_BUNDLE _TARGET)
       # Configure Info.plist
       IF(MAC_INFO_PLIST)
         CONFIGURE_FILE(${MAC_INFO_PLIST} ${CMAKE_BINARY_DIR}/Info-${_TARGET}.plist)
+        # Copy right Info.plist to right location
+        ADD_CUSTOM_COMMAND(TARGET ${_TARGET} PRE_BUILD
+          COMMAND mkdir -p ${OUTPUT_DIR}/Contents/MacOS
+          COMMAND cp ${CMAKE_BINARY_DIR}/Info-${_TARGET}.plist ${CONTENTS_DIR}/Info.plist)
       ENDIF()
-
-      # Copy right Info.plist to right location
-      ADD_CUSTOM_COMMAND(TARGET ${_TARGET} PRE_BUILD
-        COMMAND mkdir -p ${OUTPUT_DIR}/Contents/MacOS
-        COMMAND cp ${CMAKE_BINARY_DIR}/Info-${_TARGET}.plist ${CONTENTS_DIR}/Info.plist)
     ENDIF()
 ENDMACRO()
 
@@ -208,7 +207,8 @@ MACRO(SET_TARGET_FLAGS_MAC _TARGET)
           XCODE_ATTRIBUTE_INSTALL_PATH "$(LOCAL_APPS_DIR)"
           XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET ${IOS_VERSION}
           XCODE_ATTRIBUTE_TARGETED_DEVICE_FAMILY "1,2"
-          XCODE_ATTRIBUTE_VALID_ARCHS "armv7;arm64" # armv6 armv7 armv7s arm64
+          XCODE_ATTRIBUTE_ARCHS "armv7 arm64" # armv6 armv7 armv7s arm64
+          XCODE_ATTRIBUTE_VALID_ARCHS "armv7 arm64" # armv6 armv7 armv7s arm64
           XCODE_ATTRIBUTE_VALIDATE_PRODUCT YES
         )
       ENDIF()

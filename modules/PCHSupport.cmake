@@ -34,9 +34,9 @@ ELSE()
       ARGS ${CMAKE_CXX_COMPILER_ARG1} -dumpversion
       OUTPUT_VARIABLE gcc_compiler_version)
 
-    IF(gcc_compiler_version MATCHES "^4\\.1(\\.[0-9]+)?")
+    IF(gcc_compiler_version VERSION_LESS "4.2")
       SET(PCHSupport_FOUND FALSE)
-    ELSEIF(gcc_compiler_version MATCHES "^4\\.[0-9]+(\\.[0-9]+)?")
+    ELSE()
       SET(PCHSupport_FOUND TRUE)
     ENDIF()
   ELSE()
@@ -103,7 +103,7 @@ MACRO(PCH_SET_COMPILE_FLAGS _target)
       LIST(APPEND GLOBAL_DEFINITIONS " -D${item}")
     ENDFOREACH()
   ENDIF()
-  
+
   GET_TARGET_PROPERTY(oldProps ${_target} COMPILE_FLAGS)
   IF(oldProps)
     LIST(APPEND _FLAGS " ${oldProps}")
@@ -178,7 +178,7 @@ MACRO(PCH_SET_COMPILE_FLAGS _target)
   ENDIF()
 
   LIST(APPEND _FLAGS " ${GLOBAL_DEFINITIONS}")
-  
+
   IF(CMAKE_VERSION VERSION_LESS "3.3.0")
     GET_DIRECTORY_PROPERTY(_directory_flags DEFINITIONS)
     GET_DIRECTORY_PROPERTY(_directory_definitions DIRECTORY ${CMAKE_SOURCE_DIR} DEFINITIONS)
@@ -363,7 +363,7 @@ MACRO(ADD_PRECOMPILED_HEADER_TO_TARGET _targetName)
     IF(APPLE)
       SET(PCH_ADDITIONAL_COMPILER_FLAGS "-fobjc-abi-version=2 -fobjc-legacy-dispatch -x objective-c++ ${PCH_ADDITIONAL_COMPILER_FLAGS}")
     ENDIF()
-    
+
     IF(WITH_PCH_DEBUG)
       SET(PCH_ADDITIONAL_COMPILER_FLAGS "-H ${PCH_ADDITIONAL_COMPILER_FLAGS}")
     ENDIF()

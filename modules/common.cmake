@@ -899,7 +899,7 @@ MACRO(SET_TARGET_FLAGS name)
     # TODO: check if name != new_name and prepend "lib" prefix before namespace
   ENDIF()
 
-  IF(HAVE_REVISION_H)
+  IF(TARGET revision)
     # explicitly say that the executable depends on revision.h
     ADD_DEPENDENCIES(${name} revision)
   ENDIF()
@@ -1969,13 +1969,16 @@ MACRO(FIND_PACKAGE_HELPER NAME INCLUDE)
 
   # Check for root directories passed to CMake with -DXXX_DIR=...
   IF(DEFINED ${_UPNAME_FIXED}_DIR)
-    LIST(APPEND _INCLUDE_PATHS ${${_UPNAME_FIXED}_DIR}/include ${${_UPNAME_FIXED}_DIR})
-    LIST(APPEND _LIBRARY_PATHS ${${_UPNAME_FIXED}_DIR}/lib${LIB_SUFFIX})
+    SET(_TMP ${${_UPNAME_FIXED}_DIR})
+    GET_FILENAME_COMPONENT(_TMP ${_TMP} ABSOLUTE)
+    LIST(APPEND _INCLUDE_PATHS ${_TMP}/include ${_TMP})
+    LIST(APPEND _LIBRARY_PATHS ${_TMP}/lib${LIB_SUFFIX})
   ENDIF()
 
   IF(DEFINED ${_UPNAME}_DIR)
-    LIST(APPEND _INCLUDE_PATHS ${${_UPNAME}_DIR}/include ${${_UPNAME}_DIR})
-    LIST(APPEND _LIBRARY_PATHS ${${_UPNAME}_DIR}/lib${LIB_SUFFIX})
+    SET(_TMP ${${_UPNAME}_DIR})
+    LIST(APPEND _INCLUDE_PATHS ${_TMP}/include ${_TMP})
+    LIST(APPEND _LIBRARY_PATHS ${_TMP}/lib${LIB_SUFFIX})
   ENDIF()
 
   IF(UNIX)

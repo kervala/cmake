@@ -31,14 +31,18 @@ ENDMACRO()
 
 IF(Lua_FIND_VERSION_MAJOR)
   IF(NOT Lua_FIND_VERSION_MAJOR EQUAL 5)
-    MESSAGE(FATAL_ERROR "Only Lua 5.0, 5.1 and 5.2 are supported")
+    MESSAGE(FATAL_ERROR "Lua versions from 5.0 to 5.3 are supported")
   ENDIF()
 
   # check specific version
   FIND_LUA(${Lua_FIND_VERSION_MAJOR} ${Lua_FIND_VERSION_MINOR})
 ELSE()
   # check all supported versions
-  FIND_LUA(5 2)
+  FIND_LUA(5 3)
+
+  IF(NOT LUA_FOUND)
+    FIND_LUA(5 2)
+  ENDIF()
 
   IF(NOT LUA_FOUND)
     FIND_LUA(5 1)
