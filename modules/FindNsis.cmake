@@ -16,7 +16,10 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-SET(NSIS_ROOT_PATHS "$ENV{PROGRAMFILES}/NSIS" "$ENV{NSIS_DIR}")
+SET(PROGRAMEFILES "ProgramFiles")
+SET(PROGRAMEFILESX86 "ProgramFiles(x86)")
+
+SET(NSIS_ROOT_PATHS "$ENV{${PROGRAMFILES}}/NSIS" "$ENV{${PROGRAMEFILESX86}}/NSIS" "$ENV{NSIS_DIR}")
 
 FIND_PROGRAM(NSIS_EXECUTABLE
   NAMES
