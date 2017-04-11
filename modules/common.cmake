@@ -1639,6 +1639,11 @@ MACRO(INIT_BUILD_FLAGS)
       ENDIF()
     ENDIF()
 
+    # use c++0x standard to use std::unique_ptr and std::shared_ptr
+    IF(NOT XCODE)
+      SET(PLATFORM_CXXFLAGS "${PLATFORM_CXXFLAGS} -std=c++0x")
+    ENDIF()
+
     ADD_PLATFORM_FLAGS("-D_REENTRANT -g -pipe")
 
     # hardening
