@@ -25,4 +25,28 @@ IF(SPEEX_FOUND)
   IF(SPEEXDSP_FOUND)
     SET(SPEEX_LIBRARIES ${SPEEX_LIBRARIES} ${SPEEXDSP_LIBRARIES})
   ENDIF()
+
+  IF(NOT CMAKE_CROSSCOMPILING)
+    FILE(WRITE "${CMAKE_BINARY_DIR}/speex_version.cpp"
+      "#include <stdio.h>\n#include <speex/speex.h>\n\nint main(int argc, char* argv[])\n{const char *version = NULL;\nif (speex_lib_ctl(SPEEX_LIB_GET_VERSION_STRING, (void*)&version)) return 1;\nprintf(version);\nreturn 0;\n}\n")
+
+    GET_DIRECTORY_PROPERTY(_DIRS DIRECTORY ${CMAKE_SOURCE_DIR} INCLUDE_DIRECTORIES)
+
+    TRY_RUN(_RunResult
+      _CompileResult
+      ${CMAKE_BINARY_DIR}
+      ${CMAKE_BINARY_DIR}/speex_version.cpp
+      COMPILE_DEFINITIONS LINK_LIBRARIES ${SPEEX_LIBRARIES}
+      CMAKE_FLAGS "-DINCLUDE_DIRECTORIES=${_DIRS};${SPEEX_INCLUDE_DIRS}"
+      RUN_OUTPUT_VARIABLE SPEEX_VERSION
+    )
+
+    # for debugging purposes
+    # COMPILE_OUTPUT_VARIABLE _compileoutput
+    FILE(REMOVE "${CMAKE_BINARY_DIR}/speex_version.cpp")
+  ELSE()
+    SET(SPEEX_VERSION "Unknown")
+  ENDIF()
+
+  MESSAGE_VERSION_PACKAGE_HELPER(Speex ${SPEEX_VERSION} ${SPEEX_LIBRARIES})
 ENDIF()
