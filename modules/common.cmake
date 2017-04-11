@@ -1641,21 +1641,15 @@ MACRO(INIT_BUILD_FLAGS)
 
     ADD_PLATFORM_FLAGS("-D_REENTRANT -g -pipe")
 
-    # If -fstack-protector or -fstack-protector-all enabled, enable too new warnings and fix possible link problems
-    IF(PLATFORM_CFLAGS MATCHES "-fstack-protector")
-      IF(WITH_WARNINGS)
-        ADD_PLATFORM_FLAGS("-Wstack-protector")
-      ENDIF()
-      # Fix undefined reference to `__stack_chk_fail' error
-      ADD_PLATFORM_LINKFLAGS("-lc")
-    ENDIF()
+    # hardening
+    ADD_PLATFORM_FLAGS("-D_FORTIFY_SOURCE=2")
 
     IF(WITH_COVERAGE)
       ADD_PLATFORM_FLAGS("-fprofile-arcs -ftest-coverage")
     ENDIF()
 
     IF(WITH_WARNINGS)
-      ADD_PLATFORM_FLAGS("-Wall -W")
+      ADD_PLATFORM_FLAGS("-Wall")
     ELSE()
       # Check wrong formats in printf-like functions
       ADD_PLATFORM_FLAGS("-Wformat -Werror=format-security")
@@ -1707,8 +1701,24 @@ MACRO(INIT_BUILD_FLAGS)
       ENDIF()
     ENDIF()
 
+    # hardening
+    ADD_PLATFORM_FLAGS("-fstack-protector --param=ssp-buffer-size=4")
+
+    # If -fstack-protector or -fstack-protector-all enabled, enable too new warnings and fix possible link problems
+    IF(WITH_WARNINGS)
+      ADD_PLATFORM_FLAGS("-Wstack-protector")
+    ENDIF()
+
+    # Fix undefined reference to `__stack_chk_fail' error
+    ADD_PLATFORM_LINKFLAGS("-lc")
+
     IF(NOT APPLE)
       ADD_PLATFORM_LINKFLAGS("-Wl,--no-undefined -Wl,--as-needed")
+    ENDIF()
+
+    IF(NOT APPLE)
+      # hardening
+      ADD_PLATFORM_LINKFLAGS("-Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-z,now")
     ENDIF()
 
     IF(NOT WITH_SYMBOLS)
