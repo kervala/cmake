@@ -119,9 +119,9 @@ MACRO(YASM_APPEND_ASM_FILES _FILES)
     # Append resulting object file to the list
     LIST(APPEND OBJ_ASM ${OBJ})
   ENDFOREACH()
-  
+
   SOURCE_GROUP(asm FILES ${_SRC_ASM})
   SOURCE_GROUP(obj FILES ${OBJ_ASM})
-  
+
   LIST(APPEND ${_FILES} ${_SRC_ASM} ${OBJ_ASM})
 ENDMACRO()

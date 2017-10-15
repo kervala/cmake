@@ -227,6 +227,10 @@ MACRO(PCH_SET_COMPILE_FLAGS _target)
     ENDIF()
   ENDIF()
 
+  IF(USE_CPP0X AND gcc_compiler_version GREATER "6.2.0")
+    LIST(APPEND _FLAGS "-std=gnu++11")
+  ENDIF()
+
   # Format definitions
   IF(MSVC)
     # Fix path with space
