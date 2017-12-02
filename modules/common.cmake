@@ -1796,6 +1796,7 @@ MACRO(INIT_BUILD_FLAGS)
     ENDIF()
   ENDIF()
 
+  # include mac port
   IF(APPLE AND NOT IOS)
     SET(CMAKE_INCLUDE_PATH /opt/local/include ${CMAKE_INCLUDE_PATH})
     SET(CMAKE_LIBRARY_PATH /opt/local/lib ${CMAKE_LIBRARY_PATH})
@@ -1844,7 +1845,7 @@ MACRO(INIT_BUILD_FLAGS)
       ADD_PLATFORM_FLAGS("-Wformat -Werror=format-security")
 
       # Don't display invalid or unused command lines arguments by default (often too verbose)
-      ADD_PLATFORM_FLAGS("-Wno-invalid-command-line-argument -Wno-unused-command-line-argument")
+#      ADD_PLATFORM_FLAGS("-Wno-invalid-command-line-argument -Wno-unused-command-line-argument")
     ENDIF()
 
     # never display these warnings because they are minor
@@ -1903,19 +1904,13 @@ MACRO(INIT_BUILD_FLAGS)
 
     IF(NOT APPLE)
       ADD_PLATFORM_LINKFLAGS("-Wl,--no-undefined -Wl,--as-needed")
-    ENDIF()
 
-    IF(NOT APPLE)
       # hardening
       ADD_PLATFORM_LINKFLAGS("-Wl,-Bsymbolic-functions -Wl,-z,relro -Wl,-z,now")
     ENDIF()
 
-    IF(NOT WITH_SYMBOLS)
-      IF(APPLE)
-        SET(RELEASE_LINKFLAGS "${RELEASE_LINKFLAGS} -Wl,-dead_strip")
-      ELSE()
-        SET(RELEASE_LINKFLAGS "${RELEASE_LINKFLAGS} -Wl,-s")
-      ENDIF()
+    IF(NOT WITH_SYMBOLS AND NOT APPLE)
+      SET(RELEASE_LINKFLAGS "${RELEASE_LINKFLAGS} -Wl,-s")
     ENDIF()
 
     IF(WITH_STATIC_RUNTIMES AND NOT APPLE)
