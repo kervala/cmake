@@ -321,6 +321,7 @@ MACRO(INIT_BUILD_FLAGS_MAC)
         SET(TARGETS_COUNT 0)
       ENDIF()
 
+      # not universal binary
       IF(TARGETS_COUNT EQUAL 1)
         IF(TARGET_ARM)
           IF(TARGET_ARM64)
