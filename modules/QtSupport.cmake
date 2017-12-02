@@ -455,136 +455,111 @@ MACRO(LINK_QT_LIBRARIES _TARGET)
 
         FOREACH(_MODULE ${QT_MODULES_USED})
           IF(_MODULE STREQUAL "Core")
-            IF(APPLE)
-              IF(QT_VERSION GREATER "5.8")
-                # pcre2 is needed since Qt 5.5
-                SET(PCRE_LIBRARY "${QT_LIBRARY_DIR}/libqtpcre2.a")
+            # pcre2 is needed since Qt 5.5
+            LINK_MISC_LIBRARY(${_TARGET} qtpcre2 PCRE_FOUND)
+
+            IF(NOT PCRE_FOUND)
+              # pcre is needed since Qt 5.5
+              LINK_MISC_LIBRARY(${_TARGET} qtpcre PCRE_FOUND)
+            ENDIF()
+
+            IF(NOT PCRE_FOUND)
+              FIND_LIBRARY(PCRE_LIBRARY pcre16 pcre)
+              IF(PCRE_LIBRARY)
+                TARGET_LINK_LIBRARIES(${_TARGET} ${PCRE_LIBRARY})
               ELSE()
-                # pcre is needed since Qt 5.5
-                SET(PCRE_LIBRARY "${QT_LIBRARY_DIR}/libqtpcre.a")
-              ENDIF()
-
-              IF(NOT EXISTS ${PCRE_LIBRARY})
-                FIND_LIBRARY(PCRE_LIBRARY pcre16 pcre)
-              ENDIF()
-
-              IF(NOT EXISTS ${PCRE_LIBRARY})
                 MESSAGE(FATAL_ERROR "PCRE is required since Qt 5.5")
               ENDIF()
+            ENDIF()
 
-              FIND_LIBRARY(FOUNDATION_FRAMEWORK Foundation)
-              FIND_LIBRARY(CARBON_FRAMEWORK Carbon)
-              FIND_LIBRARY(SECURITY_FRAMEWORK Security)
-
-              TARGET_LINK_LIBRARIES(${_TARGET}
-                ${PCRE_LIBRARY}
-                ${FOUNDATION_FRAMEWORK}
-                ${CARBON_FRAMEWORK}
-                ${SECURITY_FRAMEWORK})
+            IF(APPLE)
+              LINK_SYSTEM_LIBRARY(${_TARGET} Foundation)
+              LINK_SYSTEM_LIBRARY(${_TARGET} Carbon)
+              LINK_SYSTEM_LIBRARY(${_TARGET} Security)
+              LINK_SYSTEM_LIBRARY(${_TARGET} Cocoa)
+              LINK_SYSTEM_LIBRARY(${_TARGET} SystemConfiguration)
             ELSEIF(WIN32)
               IF(QT_VERSION GREATER "5.8")
-                # pcre2 is needed since Qt 5.5
-                SET(PCRE_LIB "${QT_LIBRARY_DIR}/qtpcre2.lib")
-              ELSE()
-                # pcre is needed since Qt 5.5
-                SET(PCRE_LIB "${QT_LIBRARY_DIR}/qtpcre.lib")
-              ENDIF()
-
-              IF(EXISTS ${PCRE_LIB})
-                TARGET_LINK_LIBRARIES(${_TARGET} ${PCRE_LIB})
-              ENDIF()
-
-              IF(QT_VERSION GREATER "5.8")
-                TARGET_LINK_LIBRARIES(${_TARGET} Mincore.lib)
+                # we link to comsuppw because VC++ under WINE doesn't find it automatically...
+                TARGET_LINK_LIBRARIES(${_TARGET} version comsuppw)
               ENDIF()
             ELSEIF(UNIX)
-              # pcre is needed since Qt 5.5
-              SET(PCRE_LIBRARY "${QT_LIBRARY_DIR}/libqtpcre.a")
-
-              IF(NOT EXISTS ${PCRE_LIBRARY})
-                FIND_LIBRARY(PCRE_LIBRARY pcre16 pcre)
-              ENDIF()
-
-              IF(NOT EXISTS ${PCRE_LIBRARY})
-                MESSAGE(FATAL_ERROR "PCRE is required since Qt 5.5")
-              ENDIF()
-
-              TARGET_LINK_LIBRARIES(${_TARGET} ${PCRE_LIBRARY} -ldl -lrt)
+              # always link these in dynamic
+              LINK_SYSTEM_LIBRARY(${_TARGET} dl SHARED)
+#              LINK_SYSTEM_LIBRARY(${_TARGET} SHARED rt)
             ENDIF()
           ENDIF()
           IF(_MODULE STREQUAL "Network")
-            FIND_PACKAGE(OpenSSL REQUIRED)
-            FIND_PACKAGE(MyZLIB REQUIRED)
-            TARGET_LINK_LIBRARIES(${_TARGET} ${OPENSSL_LIBRARIES} ${ZLIB_LIBRARIES})
+            LINK_SYSTEM_LIBRARY(${_TARGET} ssl libssl ssleay32)
+            LINK_SYSTEM_LIBRARY(${_TARGET} crypto libcrypto libeay32)
+            LINK_SYSTEM_LIBRARY(${_TARGET} z zlib)
 
             IF(WIN32)
-              TARGET_LINK_LIBRARIES(${_TARGET}
-                ${WINSDK_LIBRARY_DIR}/Crypt32.lib
-                ${WINSDK_LIBRARY_DIR}/WS2_32.Lib
-                ${WINSDK_LIBRARY_DIR}/IPHlpApi.Lib)
+              LINK_SYSTEM_LIBRARY(${_TARGET} Crypt32)
+              LINK_SYSTEM_LIBRARY(${_TARGET} WS2_32)
+              LINK_SYSTEM_LIBRARY(${_TARGET} IPHlpApi)
             ENDIF()
           ENDIF()
           IF(_MODULE STREQUAL "Gui")
-            FIND_PACKAGE(MyPNG REQUIRED)
-            FIND_PACKAGE(JPEG REQUIRED)
-
-            TARGET_LINK_LIBRARIES(${_TARGET} ${PNG_LIBRARIES} ${JPEG_LIBRARIES})
-
-            LINK_QT_LIBRARY(${_TARGET} PrintSupport)
-            LINK_QT_LIBRARY(${_TARGET} PlatformSupport)
-            LINK_QT_LIBRARY(${_TARGET} FontDatabaseSupport)
-            LINK_QT_LIBRARY(${_TARGET} EventDispatcherSupport)
-            LINK_QT_LIBRARY(${_TARGET} ThemeSupport)
-            LINK_QT_LIBRARY(${_TARGET} AccessibilitySupport)
-
+            # order is very important there
             IF(WIN32)
-              TARGET_LINK_LIBRARIES(${_TARGET}
-                ${WINSDK_LIBRARY_DIR}/Imm32.lib
-                ${WINSDK_LIBRARY_DIR}/OpenGL32.lib
-                ${WINSDK_LIBRARY_DIR}/WinMM.Lib)
-
               LINK_QT_PLUGIN(${_TARGET} printsupport windowsprintersupport)
               LINK_QT_PLUGIN(${_TARGET} platforms qwindows)
             ELSEIF(APPLE)
-              # Cups needs .dylib
-              SET(OLD_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-              SET(CMAKE_FIND_LIBRARY_SUFFIXES .dylib)
-              FIND_LIBRARY(CUPS_LIBRARY cups)
-              SET(CMAKE_FIND_LIBRARY_SUFFIXES ${OLD_CMAKE_FIND_LIBRARY_SUFFIXES})
-
-              FIND_LIBRARY(IOKIT_FRAMEWORK IOKit)
-              FIND_LIBRARY(COCOA_FRAMEWORK Cocoa)
-              FIND_LIBRARY(SYSTEMCONFIGURATION_FRAMEWORK SystemConfiguration)
-              FIND_LIBRARY(OPENGL_FRAMEWORK NAMES OpenGL)
-
-              TARGET_LINK_LIBRARIES(${_TARGET}
-                ${CUPS_LIBRARY}
-                ${COCOA_FRAMEWORK}
-                ${SYSTEMCONFIGURATION_FRAMEWORK}
-                ${IOKIT_FRAMEWORK}
-                ${OPENGL_FRAMEWORK})
-
               LINK_QT_PLUGIN(${_TARGET} printsupport cocoaprintersupport)
               LINK_QT_PLUGIN(${_TARGET} platforms qcocoa)
             ELSE()
-              # order is very important there
               LINK_QT_PLUGIN(${_TARGET} platforms qxcb)
-              LINK_QT_PLUGIN(${_TARGET} xcbglintegrations qxcb-glx-integration)
-
               LINK_QT_LIBRARY(${_TARGET} XcbQpa)
-              LINK_QT_LIBRARY(${_TARGET} PlatformSupport)
-
-              TARGET_LINK_LIBRARIES(${_TARGET} -lX11-xcb -lXi -lSM -lICE -lxcb -lGL -lxcb-glx)
-
-              IF(EXISTS "${QT_LIBRARY_DIR}/libxcb-static.a")
-                TARGET_LINK_LIBRARIES(${_TARGET} "${QT_LIBRARY_DIR}/libxcb-static.a")
-              ENDIF()
-
-              TARGET_LINK_LIBRARIES(${_TARGET} -lfontconfig)
-
-              LINK_QT_LIBRARY(${_TARGET} DBus)
             ENDIF()
 
+            LINK_QT_LIBRARY(${_TARGET} AccessibilitySupport)
+            LINK_QT_LIBRARY(${_TARGET} CglSupport)
+            LINK_QT_LIBRARY(${_TARGET} ClipboardSupport)
+            LINK_QT_LIBRARY(${_TARGET} DeviceDiscoverySupport)
+            LINK_QT_LIBRARY(${_TARGET} EventDispatcherSupport)
+            LINK_QT_LIBRARY(${_TARGET} FbSupport)
+            LINK_QT_LIBRARY(${_TARGET} FontDatabaseSupport)
+            LINK_QT_LIBRARY(${_TARGET} GraphicsSupport)
+            LINK_QT_LIBRARY(${_TARGET} PlatformCompositorSupport)
+            LINK_QT_LIBRARY(${_TARGET} PlatformSupport)
+            LINK_QT_LIBRARY(${_TARGET} PrintSupport)
+            LINK_QT_LIBRARY(${_TARGET} ThemeSupport)
+            LINK_QT_LIBRARY(${_TARGET} ServiceSupport)
+
+            IF(WIN32)
+              LINK_SYSTEM_LIBRARY(${_TARGET} Imm32)
+              LINK_SYSTEM_LIBRARY(${_TARGET} OpenGL32)
+              LINK_SYSTEM_LIBRARY(${_TARGET} WinMM)
+              LINK_SYSTEM_LIBRARY(${_TARGET} Dwmapi)
+            ELSEIF(APPLE)
+              # Cups needs .dylib
+              LINK_SYSTEM_LIBRARY(${_TARGET} cups SHARED)
+
+              # Other frameworks
+              LINK_SYSTEM_LIBRARY(${_TARGET} IOKit)
+              LINK_SYSTEM_LIBRARY(${_TARGET} Cocoa)
+              LINK_SYSTEM_LIBRARY(${_TARGET} SystemConfiguration)
+              LINK_SYSTEM_LIBRARY(${_TARGET} OpenGL)
+            ELSE()
+              # required by themes
+              LINK_QT_LIBRARY(${_TARGET} DBus)
+
+              # internal xcb wrapper to reduce dependencies
+              LINK_MISC_LIBRARY(${_TARGET} xcb-static XCB_STATIC_FOUND)
+
+              # always link these in dynamic, API never changes
+              LINK_SYSTEM_LIBRARY(${_TARGET} X11 SHARED)
+              LINK_SYSTEM_LIBRARY(${_TARGET} Xmu SHARED)
+              LINK_SYSTEM_LIBRARY(${_TARGET} X11-xcb SHARED)
+              LINK_SYSTEM_LIBRARY(${_TARGET} Xi SHARED)
+              LINK_SYSTEM_LIBRARY(${_TARGET} SM SHARED)
+              LINK_SYSTEM_LIBRARY(${_TARGET} ICE SHARED)
+              LINK_SYSTEM_LIBRARY(${_TARGET} xcb SHARED)
+              LINK_SYSTEM_LIBRARY(${_TARGET} fontconfig SHARED)
+            ENDIF()
+
+            # common dependencies
             LINK_QT_PLUGIN(${_TARGET} imageformats qgif)
             LINK_QT_PLUGIN(${_TARGET} imageformats qicns)
             LINK_QT_PLUGIN(${_TARGET} imageformats qico)
@@ -592,40 +567,26 @@ MACRO(LINK_QT_LIBRARIES _TARGET)
             LINK_QT_PLUGIN(${_TARGET} imageformats qmng)
             LINK_QT_PLUGIN(${_TARGET} imageformats qwebp)
 
-            IF(QT_VERSION GREATER "5.8")
-              # harfbuzz is needed since Qt 5.9
-              IF(WIN32)
-                SET(HB_LIB "${QT_LIBRARY_DIR}/qtharfbuzz.lib")
-              ELSE()
-                SET(HB_LIB "${QT_LIBRARY_DIR}/libqtharfbuzz.a")
-              ENDIF()
-            ELSE()
-              # harfbuzzng is needed since Qt 5.3
-              IF(WIN32)
-                SET(HB_LIB "${QT_LIBRARY_DIR}/qtharfbuzzng.lib")
-              ELSE()
-                SET(HB_LIB "${QT_LIBRARY_DIR}/libqtharfbuzzng.a")
-              ENDIF()
-            ENDIF()
+            # 3rd-party libraries
 
-            IF(EXISTS ${HB_LIB})
-              TARGET_LINK_LIBRARIES(${_TARGET} ${HB_LIB})
+            # harfbuzz is needed since Qt 5.9
+            LINK_MISC_LIBRARY(${_TARGET} qtharfbuzz HARFBUZZ_FOUND)
+
+            IF(NOT HARFBUZZ_FOUND)
+              # harfbuzzng is needed since Qt 5.3
+              LINK_MISC_LIBRARY(${_TARGET} qtharfbuzzng HARFBUZZ_FOUND)
             ENDIF()
 
             # freetype is needed since Qt 5.5
-            IF(WIN32)
-              SET(FREETYPE_LIBRARY "${QT_LIBRARY_DIR}/qtfreetype.lib")
-            ELSE()
-              SET(FREETYPE_LIBRARY "${QT_LIBRARY_DIR}/libqtfreetype.a")
+            LINK_MISC_LIBRARY(${_TARGET} qtfreetype FREETYPE_FOUND)
 
-              IF(NOT EXISTS ${FREETYPE_LIBRARY})
-                FIND_PACKAGE(Freetype)
-              ENDIF()
+            IF(NOT FREETYPE_FOUND)
+              LINK_SYSTEM_LIBRARY(${_TARGET} freetype)
             ENDIF()
 
-            IF(EXISTS ${FREETYPE_LIBRARY})
-              TARGET_LINK_LIBRARIES(${_TARGET} ${FREETYPE_LIBRARY})
-            ENDIF()
+            LINK_SYSTEM_LIBRARY(${_TARGET} png libpng)
+            LINK_SYSTEM_LIBRARY(${_TARGET} z zlib)
+            LINK_SYSTEM_LIBRARY(${_TARGET} jpeg)
           ENDIF()
           IF(_MODULE STREQUAL "Multimedia")
             LINK_QT_PLUGIN(${_TARGET} mediaservice qtmedia_audioengine)
@@ -635,25 +596,26 @@ MACRO(LINK_QT_LIBRARIES _TARGET)
               LINK_QT_PLUGIN(${_TARGET} mediaservice dsengine)
               LINK_QT_PLUGIN(${_TARGET} mediaservice wmfengine)
 
-              TARGET_LINK_LIBRARIES(${_TARGET} ${WINSDK_LIBRARY_DIR}/strmiids.lib)
+              LINK_SYSTEM_LIBRARY(${_TARGET} strmiids)
             ELSEIF(APPLE)
               LINK_QT_PLUGIN(${_TARGET} audio qtaudio_coreaudio)
+              LINK_QT_PLUGIN(${_TARGET} audio qtmedia_pulse)
 
-              FIND_LIBRARY(COREAUDIO_FRAMEWORK CoreAudio)
-              FIND_LIBRARY(AUDIOUNIT_FRAMEWORK AudioUnit)
-              FIND_LIBRARY(AUDIOTOOLBOX_FRAMEWORK AudioToolbox)
+              LINK_SYSTEM_LIBRARY(${_TARGET} CoreAudio)
+              LINK_SYSTEM_LIBRARY(${_TARGET} AudioUnit)
+              LINK_SYSTEM_LIBRARY(${_TARGET} AudioToolbox)
+            ELSE()
+              LINK_QT_PLUGIN(${_TARGET} audio qtaudio_windows)
 
-              TARGET_LINK_LIBRARIES(${_TARGET}
-                ${AUDIOUNIT_FRAMEWORK}
-                ${COREAUDIO_FRAMEWORK}
-                ${AUDIOTOOLBOX_FRAMEWORK})
+              # always link these in dynamic
+              LINK_SYSTEM_LIBRARY(${_TARGET} pulse)
             ENDIF()
           ENDIF()
           IF(_MODULE STREQUAL "Widgets")
             LINK_QT_PLUGIN(${_TARGET} accessible qtaccessiblewidgets)
 
-            IF(WIN32 AND QT_VERSION GREATER "5.8")
-              TARGET_LINK_LIBRARIES(${_TARGET} UxTheme.lib)
+            IF(WIN32)
+              LINK_SYSTEM_LIBRARY(${_TARGET} UxTheme)
             ENDIF()
           ENDIF()
           IF(_MODULE STREQUAL "Sql")
@@ -662,16 +624,10 @@ MACRO(LINK_QT_LIBRARIES _TARGET)
           IF(_MODULE STREQUAL "Svg")
             LINK_QT_PLUGIN(${_TARGET} imageformats qsvg)
             LINK_QT_PLUGIN(${_TARGET} iconengines qsvgicon)
+            LINK_QT_LIBRARY(${_TARGET} Svg)
           ENDIF()
           IF(_MODULE STREQUAL "Qml")
-            IF(APPLE)
-              LINK_QT_PLUGIN(${_TARGET} qmltooling qmldbg_tcp)
-            ENDIF()
-          ENDIF()
-          IF(_MODULE STREQUAL "WinExtras")
-            IF(WIN32 AND QT_VERSION GREATER "5.8")
-              TARGET_LINK_LIBRARIES(${_TARGET} Dwmapi.lib)
-            ENDIF()
+            LINK_QT_PLUGIN(${_TARGET} qmltooling qmldbg_tcp)
           ENDIF()
         ENDFOREACH()
       ENDIF()
