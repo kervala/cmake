@@ -227,14 +227,14 @@ MACRO(PCH_SET_COMPILE_FLAGS _target)
     ENDIF()
   ENDIF()
 
-  IF(USE_CPP0X AND gcc_compiler_version GREATER "6.2.0")
-    LIST(APPEND _FLAGS "-std=gnu++11")
-  ENDIF()
-
   # Format definitions
   IF(MSVC)
     # Fix path with space
     SEPARATE_ARGUMENTS(_FLAGS UNIX_COMMAND "${_FLAGS}")
+  ELSE()
+    IF(USE_CPP0X)
+      LIST(APPEND _FLAGS "${CMAKE_CXX11_EXTENSION_COMPILE_OPTION}")
+    ENDIF()
   ENDIF()
 
   # Already in list form and items may contain non-leading spaces that should not be split on
