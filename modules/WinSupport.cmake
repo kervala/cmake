@@ -494,8 +494,15 @@ MACRO(CREATE_NSIS_PACKAGE _TARGET)
   ENDIF()
 
   SET(CPACK_NSIS_DISPLAY_NAME ${PRODUCT})
-  SET(CPACK_NSIS_HELP_LINK "http://dev.kervala.net/projects/${_TARGET}")
-  SET(CPACK_NSIS_URL_INFO_ABOUT "http://dev.kervala.net/projects/${_TARGET}")
+
+  IF(NOT CPACK_NSIS_HELP_LINK)
+    SET(CPACK_NSIS_HELP_LINK "http://dev.kervala.net/projects/${_TARGET}/wiki")
+  ENDIF()
+
+  IF(NOT CPACK_NSIS_URL_INFO_ABOUT)
+    SET(CPACK_NSIS_URL_INFO_ABOUT "http://dev.kervala.net/projects/${_TARGET}")
+  ENDIF()
+
   SET(CPACK_NSIS_CONTACT "kervala@gmail.com")
   SET(CPACK_NSIS_COMPRESSOR "/SOLID lzma")
 
