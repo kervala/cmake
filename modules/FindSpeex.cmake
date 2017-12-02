@@ -41,6 +41,11 @@ IF(SPEEX_FOUND)
       RUN_OUTPUT_VARIABLE SPEEX_VERSION
     )
 
+    # remove speex- prefix from returned version
+    IF(SPEEX_VERSION)
+      STRING(REGEX REPLACE "^speex-" "" SPEEX_VERSION ${SPEEX_VERSION})
+    ENDIF()
+
     # for debugging purposes
     # COMPILE_OUTPUT_VARIABLE _compileoutput
     FILE(REMOVE "${CMAKE_BINARY_DIR}/speex_version.cpp")
