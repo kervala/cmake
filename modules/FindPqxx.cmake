@@ -16,7 +16,7 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-FIND_PACKAGE_HELPER(Pqxx pqxx/pqxx RELEASE libpqxx libpqxx_static DEBUG libpqxxD libpqxx_staticD QUIET)
+FIND_PACKAGE_HELPER(Pqxx pqxx/pqxx RELEASE libpqxx libpqxx_static pqxx_static DEBUG libpqxxD libpqxx_staticD pqxx_staticD QUIET)
 
 IF(PQXX_FOUND)
   IF(PQXX_LIBRARY_RELEASE MATCHES "static")
