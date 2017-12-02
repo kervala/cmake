@@ -52,13 +52,13 @@ MACRO(YASM_SET_FLAGS)
   IF(NOT YASM_FOUND)
     MESSAGE(FATAL_ERROR "Couldn't find YASM")
   ENDIF()
-  
+
   SET(YASM_FLAGS)
-  
+
   FOREACH(ARG ${ARGN})
     LIST(APPEND YASM_FLAGS ${ARG})
   ENDFOREACH()
-  
+
   # Define output format suffix
   IF(TARGET_X64)
     SET(YASM_SUFFIX 64)
@@ -84,7 +84,7 @@ MACRO(YASM_APPEND_ASM_FILES _FILES)
   IF(NOT YASM_FOUND)
     MESSAGE(FATAL_ERROR "Couldn't find YASM to compile")
   ENDIF()
-  
+
   SET(_SRC_ASM)
   
   FOREACH(ARG ${ARGN})

@@ -48,13 +48,13 @@ MACRO(NASM_SET_FLAGS)
   IF(NOT NASM_FOUND)
     MESSAGE(FATAL_ERROR "Couldn't find NASM")
   ENDIF()
-  
+
   SET(NASM_FLAGS)
-  
+
   FOREACH(ARG ${ARGN})
     LIST(APPEND NASM_FLAGS ${ARG})
   ENDFOREACH()
-  
+
   # Define output format suffix
   IF(TARGET_X64)
     SET(NASM_SUFFIX 64)
@@ -78,7 +78,7 @@ MACRO(NASM_APPEND_ASM_FILES _FILES)
   IF(NOT NASM_FOUND)
     MESSAGE(FATAL_ERROR "Couldn't find NASM to compile")
   ENDIF()
-  
+
   SET(_SRC_ASM)
   
   FOREACH(ARG ${ARGN})
