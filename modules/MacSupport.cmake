@@ -132,22 +132,11 @@ MACRO(INIT_BUNDLE _TARGET)
     ENDIF()
 
     IF(NOT IOS)
-      SET(_SUBDIR "mac")
       SET(CONTENTS_DIR ${OUTPUT_DIR}/Contents)
       SET(RESOURCES_DIR ${CONTENTS_DIR}/Resources)
     ELSE()
-      SET(_SUBDIR "ios")
       SET(CONTENTS_DIR ${OUTPUT_DIR})
       SET(RESOURCES_DIR ${CONTENTS_DIR})
-    ENDIF()
-
-    IF(NOT MAC_RESOURCES_DIR)
-      FOREACH(ITEM ${CMAKE_MODULE_PATH})
-        IF(EXISTS "${ITEM}/${_SUBDIR}/Info.plist")
-          SET(MAC_RESOURCES_DIR "${ITEM}/${_SUBDIR}")
-          BREAK()
-        ENDIF()
-      ENDFOREACH()
     ENDIF()
 
     IF(NOT PRODUCT_XML)
@@ -236,6 +225,21 @@ ENDMACRO()
 
 MACRO(INIT_BUILD_FLAGS_MAC)
   IF(APPLE)
+    IF(NOT IOS)
+      SET(_SUBDIR "osx")
+    ELSE()
+      SET(_SUBDIR "ios")
+    ENDIF()
+
+    IF(NOT MAC_RESOURCES_DIR)
+      FOREACH(ITEM ${CMAKE_MODULE_PATH})
+        IF(EXISTS "${ITEM}/${_SUBDIR}/Info.plist")
+          SET(MAC_RESOURCES_DIR "${ITEM}/${_SUBDIR}")
+          BREAK()
+        ENDIF()
+      ENDFOREACH()
+    ENDIF()
+
     SET(OBJC_FLAGS -fobjc-abi-version=2 -fobjc-legacy-dispatch -fobjc-weak)
 
     IF(IOS)
@@ -567,7 +571,7 @@ ENDMACRO()
 MACRO(INSTALL_RESOURCES_DIR_MAC _TARGET _DIR)
   IF(APPLE)
     IF(_DIR)
-      ADD_CUSTOM_COMMAND(TARGET ${_TARGET} PRE_BUILD COMMAND cp -pr ${_DIR}/ ${RESOURCES_DIR})
+      ADD_CUSTOM_COMMAND(TARGET ${_TARGET} PRE_BUILD COMMAND cp -pr ${_DIR}/* ${RESOURCES_DIR})
     ENDIF()
   ENDIF()
 ENDMACRO()
@@ -630,8 +634,8 @@ MACRO(CREATE_IOS_PACKAGE_TARGET _TARGET)
         SET(PACKAGE_NAME "${PRODUCT_FIXED}")
       ENDIF()
 
-      SET(IPA_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PACKAGE_NAME}_ipa)
-      SET(IPA ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PACKAGE_NAME}-${VERSION}.ipa)
+      SET(IPA_DIR ${CMAKE_BINARY_DIR}/${PACKAGE_NAME}_ipa)
+      SET(IPA ${CMAKE_BINARY_DIR}/${PACKAGE_NAME}-${VERSION}.ipa)
 
       SET(_COMMANDS)
 
@@ -706,13 +710,44 @@ MACRO(CREATE_MAC_PACKAGE_TARGET _TARGET)
 
     # Creating .ipa package
     SET(_APP ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PRODUCT_FIXED}.app)
-    SET(_PKG ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${PACKAGE_BASENAME}-${VERSION}-osx.pkg)
+    SET(_PKG ${CMAKE_BINARY_DIR}/${PACKAGE_BASENAME}-${VERSION}-osx.pkg)
+    SET(PACKAGE_DIR ${CMAKE_BINARY_DIR}/package)
+
+    SET(CUSTOM_OPTIONS)
+
+    IF(BG)
+      SET(CUSTOM_OPTIONS "${CUSTOM_OPTIONS}    <background file=\"background\" mime-type=\"image/png\" alignment=\"bottomleft\" scaling=\"none\"/>\n")
+    ENDIF()
+
+    IF(WELCOME)
+      SET(CUSTOM_OPTIONS "${CUSTOM_OPTIONS}    <welcome mime-type=\"text/plain\" file=\"Welcome.txt\"/>\n")
+    ENDIF()
+
+    # TODO: support i18n
+    IF(CPACK_PACKAGE_DESCRIPTION_FILE)
+      CONFIGURE_FILE(${CPACK_PACKAGE_DESCRIPTION_FILE} ${PACKAGE_DIR}/Resources/en.lproj/ReadMe.txt COPYONLY)
+      SET(CUSTOM_OPTIONS "${CUSTOM_OPTIONS}    <readme mime-type=\"text/plain\" file=\"ReadMe.txt\"/>\n")
+    ENDIF()
+
+    IF(CPACK_RESOURCE_FILE_LICENSE)
+      CONFIGURE_FILE(${CPACK_RESOURCE_FILE_LICENSE} ${PACKAGE_DIR}/Resources/en.lproj/License.txt COPYONLY)
+      SET(CUSTOM_OPTIONS "${CUSTOM_OPTIONS}    <license mime-type=\"text/plain\" file=\"License.txt\"/>\n")
+    ENDIF()
+
+    CONFIGURE_FILE(${MAC_RESOURCES_DIR}/Distribution.in ${PACKAGE_DIR}/Distribution)
+    CONFIGURE_FILE(${MAC_RESOURCES_DIR}/PackageInfo.in ${PACKAGE_DIR}/${MACOSX_BUNDLE_GUI_IDENTIFIER}.pkg/PackageInfo)
 
     ADD_CUSTOM_TARGET(packages
-      COMMAND productbuild --identifier "${MACOSX_BUNDLE_GUI_IDENTIFIER}" --version "${VERSION}" --component ${_APP} /Applications ${_PKG}
+      COMMAND ${MAC_RESOURCES_DIR}/create_pkg.sh "${PACKAGE_DIR}" "${_APP}" "${_PKG}"
       COMMENT "Creating OS X package..."
       SOURCES ${MAC_ITUNESARTWORK}
       VERBATIM)
+
+#    ADD_CUSTOM_TARGET(packages
+#      COMMAND productbuild --identifier "${MACOSX_BUNDLE_GUI_IDENTIFIER}" --version "${VERSION}" --component ${_APP} /Applications ${_PKG}
+#      COMMENT "Creating OS X package..."
+#      SOURCES ${MAC_ITUNESARTWORK}
+#      VERBATIM)
     ADD_DEPENDENCIES(packages ${_TARGET})
     SET_TARGET_LABEL(packages "PACKAGE")
   ENDIF()
