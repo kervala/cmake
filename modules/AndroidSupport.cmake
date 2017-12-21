@@ -92,7 +92,7 @@ MACRO(INIT_BUILD_FLAGS_ANDROID)
       ENDIF()
     ELSEIF(TARGET_MIPS)
       IF(TARGET_MIPS64)
-        ADD_PLATFORM_FLAGS("-fintegrated-as)
+        ADD_PLATFORM_FLAGS("-fintegrated-as")
       ELSE()
         # We need to specify that to force an older arch for compatibility
         ADD_PLATFORM_FLAGS("-mips32")
