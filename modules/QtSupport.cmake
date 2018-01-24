@@ -481,9 +481,14 @@ MACRO(LINK_QT_LIBRARIES _TARGET)
               LINK_SYSTEM_LIBRARY(${_TARGET} Cocoa)
               LINK_SYSTEM_LIBRARY(${_TARGET} SystemConfiguration)
             ELSEIF(WIN32)
-              IF(QT_VERSION GREATER "5.8")
+              IF(QT_VERSION VERSION_GREATER "5.8")
                 # we link to comsuppw because VC++ under WINE doesn't find it automatically...
-                TARGET_LINK_LIBRARIES(${_TARGET} version comsuppw)
+                LINK_SYSTEM_LIBRARY(${_TARGET} version)
+                LINK_SYSTEM_LIBRARY(${_TARGET} comsuppw)
+              ENDIF()
+              IF(QT_VERSION VERSION_GREATER "5.9.9")
+                LINK_SYSTEM_LIBRARY(${_TARGET} NetAPI32)
+                LINK_SYSTEM_LIBRARY(${_TARGET} Userenv)
               ENDIF()
             ELSEIF(UNIX)
               # always link these in dynamic
@@ -618,6 +623,9 @@ MACRO(LINK_QT_LIBRARIES _TARGET)
 
             IF(WIN32)
               LINK_SYSTEM_LIBRARY(${_TARGET} UxTheme)
+
+              # Windows Vista style plugin
+              LINK_QT_PLUGIN(${_TARGET} styles qwindowsvistastyle)
             ENDIF()
           ENDIF()
           IF(_MODULE STREQUAL "Sql")
@@ -809,6 +817,7 @@ MACRO(INSTALL_QT_LIBRARIES)
 
           IF(_MODULE STREQUAL "Widgets")
             INSTALL_QT_PLUGIN(accessible qtaccessiblewidgets)
+            INSTALL_QT_PLUGIN(styles qwindowsvistastyle)
           ENDIF()
 
           # Quick and Qml need V8

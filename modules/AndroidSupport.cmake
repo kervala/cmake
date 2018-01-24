@@ -18,42 +18,24 @@
 
 MACRO(INIT_BUILD_FLAGS_ANDROID)
   IF(ANDROID)
-    ADD_PLATFORM_FLAGS("--sysroot=${CMAKE_SYSROOT}/usr")
+    # System includes
+    ADD_PLATFORM_FLAGS("-isystem ${STL_INCLUDE_DIR}")
+    ADD_PLATFORM_FLAGS("-isystem ${ANDROID_SUPPORT_INCLUDE_DIR}")
+    ADD_PLATFORM_FLAGS("-isystem ${STL_INCLUDE_ABI_DIR}")
     ADD_PLATFORM_FLAGS("-isystem ${CMAKE_SYSROOT}/usr/include/${TOOLCHAIN_BIN_PREFIX}")
+
     ADD_PLATFORM_FLAGS("-ffunction-sections -funwind-tables -no-canonical-prefixes")
     ADD_PLATFORM_FLAGS("-DANDROID")
     ADD_PLATFORM_FLAGS("-D__ANDROID_API__=${MINIMUM_NDK_TARGET}")
-    ADD_PLATFORM_FLAGS("-I${STL_INCLUDE_DIR} -I${STL_INCLUDE_CPU_DIR}")
+
+    # use libc++ under Android
+    SET(PLATFORM_CXXFLAGS "${PLATFORM_CXXFLAGS} -stdlib=libc++")
 
     # security
     ADD_PLATFORM_FLAGS("-fstack-protector-strong -Wa,--noexecstack")
 
     # support C++11
-    ADD_PLATFORM_FLAGS("-std=c++11")
-
-    IF(TARGET_ARM64)
-      SET(LLVM_TRIPLE "aarch64-none-linux-android")
-    ELSEIF(TARGET_ARMV7)
-      SET(LLVM_TRIPLE "armv7-none-linux-androideabi")
-    ELSEIF(TARGET_ARMV5)
-      SET(LLVM_TRIPLE "armv5te-none-linux-androideabi")
-    ELSEIF(TARGET_X64)
-      SET(LLVM_TRIPLE "x86_64-none-linux-android")
-    ELSEIF(TARGET_X86)
-      SET(LLVM_TRIPLE "i686-none-linux-android")
-    ELSEIF(TARGET_MIPS64)
-      SET(LLVM_TRIPLE "mips64el-none-linux-android")
-    ELSEIF(TARGET_MIPS)
-      SET(LLVM_TRIPLE "mipsel-none-linux-android")
-    ELSE()
-      MESSAGE(FATAL_ERROR "Unspported architecture ${TARGET_CPU}")
-    ENDIF()
-
-    ADD_PLATFORM_FLAGS("-gcc-toolchain ${GCC_TOOLCHAIN_ROOT}")
-    ADD_PLATFORM_LINKFLAGS("-gcc-toolchain ${GCC_TOOLCHAIN_ROOT}")
-
-    ADD_PLATFORM_FLAGS("-target ${LLVM_TRIPLE}")
-    ADD_PLATFORM_LINKFLAGS("-target ${LLVM_TRIPLE}")
+#    ADD_PLATFORM_FLAGS("-std=c++11")
 
     # To not warning is linker parameters are not supported
     ADD_PLATFORM_LINKFLAGS("-Qunused-arguments")
@@ -68,7 +50,7 @@ MACRO(INIT_BUILD_FLAGS_ANDROID)
         # no specific options
       ELSEIF(TARGET_ARMV7)
         # only correct archs are managed
-        ADD_PLATFORM_FLAGS("-march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16")
+        ADD_PLATFORM_FLAGS("-march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16 -D__ARM_V7__")
         ADD_PLATFORM_FLAGS("-fno-integrated-as")
 
         ADD_PLATFORM_LINKFLAGS("-Wl,--fix-cortex-a8 -Wl,--exclude-libs,libunwind.a")
