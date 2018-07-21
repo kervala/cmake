@@ -16,8 +16,4 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-IF(CRYPTO_DIR)
-  SET(BOOSTCRYPTO_DIR ${CRYPTO_DIR})
-ENDIF(CRYPTO_DIR)
-
-FIND_PACKAGE_HELPER(BoostCrypto crypto/md5.hpp RELEASE boost_crypto DEBUG boost_cryptod)
+FIND_PACKAGE_HELPER(BoostCrypto crypto/md5.hpp RELEASE boost_crypto DEBUG boost_cryptod DIR ${CRYPTO_DIR})

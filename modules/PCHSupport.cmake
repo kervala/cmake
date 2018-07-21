@@ -59,6 +59,7 @@ ENDMACRO()
 MACRO(PCH_SET_COMPILE_FLAGS _target)
   SET(PCH_FLAGS)
   SET(PCH_ARCHS)
+  SET(PCH_INCLUDES)
 
   # Append target for clang if defined
   IF(CMAKE_CXX_COMPILER_TARGET)
@@ -71,6 +72,12 @@ MACRO(PCH_SET_COMPILE_FLAGS _target)
 
   IF(CMAKE_SYSROOT)
     LIST(APPEND PCH_FLAGS "--sysroot=${CMAKE_SYSROOT}")
+  ENDIF()
+
+  IF(CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES)
+    FOREACH(item ${CMAKE_CXX_STANDARD_INCLUDE_DIRECTORIES})
+      LIST(APPEND PCH_FLAGS "-isystem ${item}")
+    ENDFOREACH()
   ENDIF()
 
   # C++ flags
@@ -104,7 +111,7 @@ MACRO(PCH_SET_COMPILE_FLAGS _target)
 
   GET_DIRECTORY_PROPERTY(DIRINC INCLUDE_DIRECTORIES)
   FOREACH(item ${DIRINC})
-    LIST(APPEND PCH_FLAGS -I ${item})
+    LIST(APPEND PCH_INCLUDES "${item}")
   ENDFOREACH()
 
   # NOTE: As cmake files (eg FindQT4) may now use generator expressions around their defines that evaluate
@@ -127,14 +134,14 @@ MACRO(PCH_SET_COMPILE_FLAGS _target)
     ENDFOREACH()
   ENDIF()
 
-  GET_DIRECTORY_PROPERTY(DEFINITIONS DIRECTORY ${CMAKE_SOURCE_DIR} COMPILE_DEFINITIONS)
+  GET_DIRECTORY_PROPERTY(DEFINITIONS DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} COMPILE_DEFINITIONS)
   IF(DEFINITIONS)
     FOREACH(item ${DEFINITIONS})
       APPEND_DEFINITION(GLOBAL_DEFINITIONS ${item})
     ENDFOREACH()
   ENDIF()
 
-  GET_DIRECTORY_PROPERTY(DEFINITIONS DIRECTORY ${CMAKE_SOURCE_DIR} COMPILE_DEFINITIONS_${_UPPER_BUILD})
+  GET_DIRECTORY_PROPERTY(DEFINITIONS DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} COMPILE_DEFINITIONS_${_UPPER_BUILD})
   IF(DEFINITIONS)
     FOREACH(item ${DEFINITIONS})
       APPEND_DEFINITION(GLOBAL_DEFINITIONS ${item})
@@ -158,7 +165,7 @@ MACRO(PCH_SET_COMPILE_FLAGS _target)
   GET_TARGET_PROPERTY(DIRINC ${_target} INCLUDE_DIRECTORIES)
   IF(DIRINC)
     FOREACH(item ${DIRINC})
-      LIST(APPEND PCH_FLAGS -I ${item})
+      LIST(APPEND PCH_INCLUDES "${item}")
     ENDFOREACH()
   ENDIF()
 
@@ -197,7 +204,7 @@ MACRO(PCH_SET_COMPILE_FLAGS _target)
 
         IF(_DIRS)
           FOREACH(item ${_DIRS})
-            LIST(APPEND GLOBAL_DEFINITIONS -I ${item})
+            LIST(APPEND PCH_INCLUDES "${item}")
           ENDFOREACH()
         ENDIF()
 
@@ -240,7 +247,7 @@ MACRO(PCH_SET_COMPILE_FLAGS _target)
       ENDFOREACH()
     ENDIF()
 
-    GET_DIRECTORY_PROPERTY(_DIRECTORY_DEFINITIONS DIRECTORY ${CMAKE_SOURCE_DIR} DEFINITIONS)
+    GET_DIRECTORY_PROPERTY(_DIRECTORY_DEFINITIONS DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} DEFINITIONS)
 
     IF(_DIRECTORY_DEFINITIONS)
       SEPARATE_ARGUMENTS(_DIRECTORY_DEFINITIONS)
@@ -294,7 +301,13 @@ MACRO(PCH_SET_COMPILE_FLAGS _target)
 
   SET(PCH_FLAGS ${_FINAL_FLAGS})
 
+  # Remove flags that don't work with PCH
+  LIST(REMOVE_ITEM PCH_FLAGS "-Wa,--noexecstack")
+
+  # Remove all empty parameters
   LIST(REMOVE_ITEM PCH_FLAGS "")
+
+  # Remove duplicate parameters
   LIST(REMOVE_DUPLICATES PCH_FLAGS)
 
   # create a command-line string
@@ -304,7 +317,7 @@ MACRO(PCH_SET_COMPILE_FLAGS _target)
   SEPARATE_ARGUMENTS(PCH_FLAGS)
 ENDMACRO()
 
-MACRO(PCH_SET_COMPILE_COMMAND _inputcpp _compile_FLAGS)
+MACRO(PCH_SET_COMPILE_COMMAND _inputcpp _compile_FLAGS _includes)
   IF(CMAKE_CXX_COMPILER_ARG1)
     # remove leading space in compiler argument
     STRING(REGEX REPLACE "^ +" "" pchsupport_compiler_cxx_arg1 ${CMAKE_CXX_COMPILER_ARG1})
@@ -314,18 +327,33 @@ MACRO(PCH_SET_COMPILE_COMMAND _inputcpp _compile_FLAGS)
 
   IF(MSVC)
     GET_INTERMEDIATE_PDB_FULLPATH(${_PCH_current_target} _PDB_FILE)
-    SET(PCH_COMMAND ${CMAKE_CXX_COMPILER} ${pchsupport_compiler_cxx_arg1} ${_compile_FLAGS} /Yc /Fp"${PCH_OUTPUT}" ${_inputcpp} /Fd"${_PDB_FILE}" /c /Fo"${PCH_OUTPUT}.obj")
+
+    SET(PCH_TEMP_CONTENT)
+
+    FOREACH(_include ${_includes})
+      SET(PCH_TEMP_CONTENT "${PCH_TEMP_CONTENT} -I \"${_include}\"")
+    ENDFOREACH()
+
+    SET(PCH_TEMP_FILE ${CMAKE_CURRENT_BINARY_DIR}/pch_command.txt)
+    FILE(WRITE ${PCH_TEMP_FILE} "${PCH_TEMP_CONTENT}")
+
+    SET(PCH_COMMAND ${CMAKE_CXX_COMPILER} /nologo @${PCH_TEMP_FILE} ${pchsupport_compiler_cxx_arg1} ${_compile_FLAGS} /Yc /Fp"${PCH_OUTPUT}" ${_inputcpp} /Fd"${_PDB_FILE}" /c /Fo"${PCH_OUTPUT}.obj")
 
     # Ninja PCH Support
     # http://public.kitware.com/pipermail/cmake-developers/2012-March/003653.html
     SET_SOURCE_FILES_PROPERTIES(${_inputcpp} PROPERTIES OBJECT_OUTPUTS "${PCH_OUTPUT}.obj")
   ELSE()
     SET(HEADER_FORMAT "c++-header")
-    SET(_FLAGS "")
+    SET(_FLAGS)
     IF(APPLE)
       SET(HEADER_FORMAT "objective-${HEADER_FORMAT}")
-      SET(_FLAGS ${OBJC_FLAGS})
+      LIST(APPEND _FLAGS ${OBJC_FLAGS})
     ENDIF()
+
+    FOREACH(_include ${_includes})
+      LIST(APPEND _FLAGS -I "${_include}")
+    ENDFOREACH()
+
     SET(PCH_COMMAND ${CMAKE_CXX_COMPILER} ${pchsupport_compiler_cxx_arg1} ${_compile_FLAGS} ${_FLAGS} -x ${HEADER_FORMAT} -o ${PCH_OUTPUT} -c ${PCH_INPUT})
   ENDIF()
 ENDMACRO()
@@ -467,7 +495,7 @@ MACRO(ADD_PRECOMPILED_HEADER _targetName _inputh _inputcpp)
       PCH_SET_PRECOMPILED_HEADER_OUTPUT(${_targetName} ${_inputh} ${_ARCH} "")
       LIST(APPEND PCH_OUTPUTS ${PCH_OUTPUT})
 
-      PCH_SET_COMPILE_COMMAND(${_inputcpp} "${PCH_ARCH_${_UPPER_ARCH}_FLAGS};${PCH_FLAGS}")
+      PCH_SET_COMPILE_COMMAND(${_inputcpp} "${PCH_ARCH_${_UPPER_ARCH}_FLAGS};${PCH_FLAGS}" "${PCH_INCLUDES}")
       PCH_CREATE_TARGET(${_targetName} ${_targetName}_pch_${_ARCH})
 
       ADD_PRECOMPILED_HEADER_TO_TARGET_ARCH(${_targetName} ${_ARCH})
@@ -476,7 +504,7 @@ MACRO(ADD_PRECOMPILED_HEADER _targetName _inputh _inputcpp)
     PCH_SET_PRECOMPILED_HEADER_OUTPUT(${_targetName} ${_inputh} "" "")
     LIST(APPEND PCH_OUTPUTS ${PCH_OUTPUT})
 
-    PCH_SET_COMPILE_COMMAND(${_inputcpp} "${PCH_FLAGS}")
+    PCH_SET_COMPILE_COMMAND(${_inputcpp} "${PCH_FLAGS}" "${PCH_INCLUDES}")
     PCH_CREATE_TARGET(${_targetName} ${_targetName}_pch)
   ENDIF()
 

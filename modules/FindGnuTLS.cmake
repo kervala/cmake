@@ -16,4 +16,4 @@
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-FIND_PACKAGE_HELPER(GnuTLS gnutls/gnutls.h RELEASE libgnutls gnutls-26 libgnutls-26 DEBUG libgnutlsd gnutls-26d libgnutls-26d)
+FIND_PACKAGE_HELPER(GnuTLS gnutls/gnutls.h RELEASE gnutls_static libgnutls gnutls gnutls-26 libgnutls-26 DEBUG libgnutlsd gnutls-26d libgnutls-26d)

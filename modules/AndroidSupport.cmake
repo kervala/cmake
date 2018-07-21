@@ -18,70 +18,38 @@
 
 MACRO(INIT_BUILD_FLAGS_ANDROID)
   IF(ANDROID)
-    # System includes
-    ADD_PLATFORM_FLAGS("-isystem ${STL_INCLUDE_DIR}")
-    ADD_PLATFORM_FLAGS("-isystem ${ANDROID_SUPPORT_INCLUDE_DIR}")
-    ADD_PLATFORM_FLAGS("-isystem ${STL_INCLUDE_ABI_DIR}")
-    ADD_PLATFORM_FLAGS("-isystem ${CMAKE_SYSROOT}/usr/include/${TOOLCHAIN_BIN_PREFIX}")
+    # Generic compiler flags
+    SET(PLATFORM_CFLAGS "${PLATFORM_CFLAGS} ${ANDROID_COMPILER_FLAGS}")
+    SET(PLATFORM_CXXFLAGS "${PLATFORM_CXXFLAGS} ${ANDROID_COMPILER_FLAGS} ${ANDROID_COMPILER_FLAGS_CXX}")
+    SET(PLATFORM_EXE_LINKFLAGS "${PLATFORM_EXE_LINKFLAGS} ${ANDROID_LINKER_FLAGS} ${ANDROID_LINKER_FLAGS_EXE}")
+    SET(PLATFORM_MODULE_LINKFLAGS "${PLATFORM_MODULE_LINKFLAGS} ${ANDROID_LINKER_FLAGS}")
+    SET(PLATFORM_SHARED_LINKFLAGS "${PLATFORM_SHARED_LINKFLAGS} ${ANDROID_LINKER_FLAGS}")
 
-    ADD_PLATFORM_FLAGS("-ffunction-sections -funwind-tables -no-canonical-prefixes")
-    ADD_PLATFORM_FLAGS("-DANDROID")
-    ADD_PLATFORM_FLAGS("-D__ANDROID_API__=${MINIMUM_NDK_TARGET}")
+    # Debug
+    SET(DEBUG_CFLAGS "${DEBUG_CFLAGS} ${ANDROID_COMPILER_FLAGS_DEBUG}")
 
-    # use libc++ under Android
-    SET(PLATFORM_CXXFLAGS "${PLATFORM_CXXFLAGS} -stdlib=libc++")
+    # Release
+    SET(RELEASE_CFLAGS "${RELEASE_CFLAGS} ${ANDROID_COMPILER_FLAGS_RELEASE}")
 
-    # security
-    ADD_PLATFORM_FLAGS("-fstack-protector-strong -Wa,--noexecstack")
+    # Define architecture
+    SET(CMAKE_LIBRARY_ARCHITECTURE ${ANDROID_ABI})
+    SET(LIBRARY_ARCHITECTURE ${ANDROID_ABI})
 
-    # support C++11
-#    ADD_PLATFORM_FLAGS("-std=c++11")
-
-    # To not warning is linker parameters are not supported
-    ADD_PLATFORM_LINKFLAGS("-Qunused-arguments")
-
-    # better debugability with LLDB
-    SET(DEBUG_CFLAGS "${DEBUG_CFLAGS} -fno-limit-debug-info")
+    # Append search path for libraries
+    LIST(APPEND CMAKE_FIND_ROOT_PATH ${CMAKE_PREFIX_PATH} ${CMAKE_INSTALL_PREFIX} $ENV{EXTERNAL_ANDROID_PATH})
 
     IF(TARGET_ARM)
       ADD_PLATFORM_FLAGS("-D__ARM_ARCH_5__ -D__ARM_ARCH_5T__ -D__ARM_ARCH_5E__ -D__ARM_ARCH_5TE__")
 
-      IF(TARGET_ARM64)
-        # no specific options
-      ELSEIF(TARGET_ARMV7)
-        # only correct archs are managed
-        ADD_PLATFORM_FLAGS("-march=armv7-a -mfloat-abi=softfp -mfpu=vfpv3-d16 -D__ARM_V7__")
-        ADD_PLATFORM_FLAGS("-fno-integrated-as")
-
-        ADD_PLATFORM_LINKFLAGS("-Wl,--fix-cortex-a8 -Wl,--exclude-libs,libunwind.a")
-      ELSEIF(TARGET_ARMV5)
-        ADD_PLATFORM_FLAGS("-fno-integrated-as")
-        ADD_PLATFORM_FLAGS("-march=armv5te -mtune=xscale -msoft-float")
-
-        ADD_PLATFORM_LINKFLAGS("-Wl,--exclude-libs,libunwind.a")
+      IF(TARGET_ARMV7)
+        ADD_PLATFORM_FLAGS("-D__ARM_V7__")
       ENDIF()
 
-      SET(TARGET_THUMB ON)
-
-      IF(TARGET_THUMB)
-        ADD_PLATFORM_FLAGS("-mthumb")
+      IF(ANDROID_ARM_MODE STREQUAL "thumb")
+        SET(TARGET_THUMB ON)
       ELSE()
-        ADD_PLATFORM_FLAGS("-marm")
-      ENDIF()
-    ELSEIF(TARGET_X86)
-      IF(NOT TARGET_X64)
-        ADD_PLATFORM_FLAGS("-mstackrealign")
-      ENDIF()
-    ELSEIF(TARGET_MIPS)
-      IF(TARGET_MIPS64)
-        ADD_PLATFORM_FLAGS("-fintegrated-as")
-      ELSE()
-        # We need to specify that to force an older arch for compatibility
-        ADD_PLATFORM_FLAGS("-mips32")
+        SET(TARGET_THUMB OFF)
       ENDIF()
     ENDIF()
-
-    ADD_PLATFORM_LINKFLAGS("-Wl,--build-id-Wl,--warn-shared-textrel -Wl,--fatal-warnings -Wl,-z,noexecstack -Wl,-z,relro -Wl,-z,now -no-canonical-prefixes")
-    ADD_PLATFORM_LINKFLAGS("-L${PLATFORM_ROOT}/usr/lib")
   ENDIF()
 ENDMACRO()

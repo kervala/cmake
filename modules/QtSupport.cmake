@@ -130,7 +130,7 @@ MACRO(USE_QT_MODULES)
   SET(QT4_MODULES ${QT_SHARED_MODULES} Main)
 
   # Qt 5 modules
-  SET(QT5_MODULES ${QT_SHARED_MODULES} Bluetooth Concurrent DBus LinguistTools Location MultimediaQuick MultimediaWidgets Nfc OpenGL OpenGLExtensions PlatformSupport Positioning PrintSupport Quick QuickParticles QuickTest QuickWidgets Sensors SerialBus SerialPort UiPlugin UiTools V8 WebChannel WebEngine WebEngineCore WebEngineWidgets WebKitWidgets WebSockets WebView Widgets 3DCore 3DInput 3DLogic 3DQuick 3DQuickInput 3DQuickRender 3DRender)
+  SET(QT5_MODULES ${QT_SHARED_MODULES} Bluetooth Charts Concurrent DBus LinguistTools Location MultimediaQuick MultimediaWidgets Nfc OpenGL OpenGLExtensions PlatformSupport Positioning PrintSupport Quick QuickParticles QuickTest QuickWidgets Sensors SerialBus SerialPort UiPlugin UiTools V8 WebChannel WebEngine WebEngineCore WebEngineWidgets WebKitWidgets WebSockets WebView Widgets 3DCore 3DInput 3DLogic 3DQuick 3DQuickInput 3DQuickRender 3DRender)
 
   # Use WinExtras only under Windows
   IF(WIN32)
@@ -630,6 +630,7 @@ MACRO(LINK_QT_LIBRARIES _TARGET)
           ENDIF()
           IF(_MODULE STREQUAL "Sql")
             LINK_QT_PLUGIN(${_TARGET} sqldrivers qsqlite)
+			LINK_QT_PLUGIN(${_TARGET} sqldrivers qsqlmysql)
           ENDIF()
           IF(_MODULE STREQUAL "Svg")
             LINK_QT_PLUGIN(${_TARGET} imageformats qsvg)
@@ -827,6 +828,7 @@ MACRO(INSTALL_QT_LIBRARIES)
 
           IF(_MODULE STREQUAL "Sql")
             INSTALL_QT_PLUGIN(sqldrivers qsqlite)
+			INSTALL_QT_PLUGIN(sqldrivers qsqlmysql)
           ENDIF()
 
           IF(_MODULE STREQUAL "Svg")
